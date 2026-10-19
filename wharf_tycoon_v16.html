@@ -1,0 +1,2430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wharf Tycoon — Boat Rental</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --panel:#1a2330; --panel2:#212c3b; --line:#324258;
+    --gold:#e0b04a; --good:#4caf6f; --bad:#e05a4f; --warn:#e0a23f; --txt:#eaf0f6; --txt-dim:#9db0c4;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0c1117;color:var(--txt);font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;}
+  #scene-canvas{position:fixed;inset:0;display:block;}
+
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10;}
+  #topbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:20px;padding:8px 16px;background:linear-gradient(180deg,rgba(20,28,38,.88),rgba(20,28,38,.4));pointer-events:auto;}
+  #topbar .brand{font-weight:700;color:var(--gold);margin-right:6px;}
+  .stat{display:flex;flex-direction:column;line-height:1.1;min-width:64px;}
+  .stat .v{font-weight:700;font-size:14px;}
+  .stat .l{font-size:9px;color:var(--txt-dim);}
+  .stars{color:var(--gold);}
+  #timectrl{display:flex;gap:4px;margin-left:auto;align-items:center;}
+  #timectrl button, #topbar #menuToggle, #topbar #openBtn3d{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:5px 9px;border-radius:6px;cursor:pointer;font-size:12px;}
+  #timectrl button.active{background:var(--gold);color:#1a1200;border-color:var(--gold);}
+  #openBtn3d.closed{background:var(--good);color:#06280f;border-color:var(--good);font-weight:700;}
+
+  #crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;pointer-events:none;}
+  #crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(255,255,255,.85);}
+  #crosshair::before{left:50%;top:0;width:2px;height:8px;transform:translateX(-1px);}
+  #crosshair::after{top:50%;left:0;height:2px;width:8px;transform:translateY(-1px);}
+
+  #stopBuildBtn{position:absolute;top:50%;left:50%;transform:translate(-50%, 46px);background:var(--bad);color:#fff;border:none;padding:12px 22px;border-radius:30px;font-size:14px;font-weight:700;cursor:pointer;pointer-events:auto;display:none;box-shadow:0 4px 14px rgba(0,0,0,.4);}
+  #stopBuildBtn:hover{filter:brightness(1.1);}
+
+  #interactPrompt{position:absolute;top:58%;left:50%;transform:translate(-50%,0);background:rgba(20,28,38,.9);border:1px solid var(--gold);border-radius:8px;padding:8px 16px;font-size:13px;pointer-events:none;display:none;text-align:center;}
+  #interactPrompt b{color:var(--gold);}
+
+  #hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(20,28,38,.8);border:1px solid var(--line);border-radius:8px;padding:7px 14px;font-size:12px;color:var(--txt-dim);pointer-events:none;text-align:center;}
+  #buildHUD{position:absolute;bottom:14px;left:14px;background:rgba(20,28,38,.88);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:12px;pointer-events:none;display:none;max-width:260px;}
+  #buildHUD b{color:var(--gold);}
+  #ticker{position:absolute;bottom:14px;right:14px;max-width:340px;background:rgba(20,28,38,.88);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--txt-dim);pointer-events:none;display:none;}
+  #ticker b{color:var(--gold);}
+
+  #startOverlay{position:fixed;inset:0;background:rgba(5,8,12,.92);display:flex;align-items:center;justify-content:center;z-index:60;flex-direction:column;text-align:center;padding:20px;}
+  #startOverlay h1{color:var(--gold);margin-bottom:6px;}
+  #startOverlay p{color:var(--txt-dim);max-width:480px;line-height:1.6;font-size:13px;}
+  #startOverlay button{margin-top:18px;padding:12px 26px;border-radius:8px;border:none;background:var(--gold);color:#1a1200;font-weight:700;font-size:15px;cursor:pointer;}
+  #startOverlay .keys{display:flex;gap:16px;margin-top:20px;flex-wrap:wrap;justify-content:center;}
+  #startOverlay .key{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--txt-dim);}
+  #startOverlay .key b{display:block;color:var(--txt);font-size:13px;margin-bottom:2px;}
+  #tutorialBanner{position:fixed;top:56px;left:50%;transform:translateX(-50%);background:rgba(224,176,74,0.95);color:#1a1200;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:40;display:none;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.4);}
+  #tutorialBanner button{margin-left:12px;padding:4px 10px;border-radius:6px;border:none;background:#1a1200;color:#e0b04a;font-size:11px;font-weight:700;cursor:pointer;}
+
+  #buildMenu{position:fixed;left:0;top:0;bottom:0;width:300px;background:#161f2b;border-right:1px solid var(--line);z-index:50;display:none;padding:14px;overflow-y:auto;}
+  #buildMenu h2{color:var(--gold);font-size:15px;margin:2px 0 12px;}
+  #buildMenu .catrow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  #buildMenu .cat-btn{flex:1 1 40%;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 4px;text-align:center;font-size:11px;cursor:pointer;color:var(--txt);}
+  #buildMenu .cat-btn.active{background:var(--gold);color:#1a1200;border-color:var(--gold);}
+  .item-card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;cursor:pointer;}
+  .item-card:hover,.item-card.selected{border-color:var(--gold);}
+  .item-card .nm{font-weight:600;font-size:13px;display:flex;justify-content:space-between;}
+  .item-card .desc{font-size:11px;color:var(--txt-dim);margin-top:3px;}
+  .item-card .cost{font-size:12px;color:var(--good);margin-top:4px;}
+  .item-card .cost.no{color:var(--bad);}
+  #bulldozeItem{background:#4a2020;border:1px solid #7a3030;color:#ffb;padding:9px;border-radius:8px;text-align:center;cursor:pointer;margin-bottom:10px;font-size:12px;}
+  #bulldozeItem.active{background:var(--bad);color:#fff;}
+  #closeMenuBtn{width:100%;padding:9px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);cursor:pointer;margin-top:6px;}
+
+  #infoPanel{position:fixed;right:0;top:0;bottom:0;width:270px;background:#161f2b;border-left:1px solid var(--line);padding:14px;z-index:50;display:none;overflow-y:auto;}
+  #infoPanel h3{margin:0 0 4px;color:var(--gold);font-size:15px;}
+  #infoPanel .sub{color:var(--txt-dim);font-size:12px;margin-bottom:10px;}
+  #infoPanel .row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #23303f;}
+  #infoPanel button{width:100%;margin-top:10px;padding:8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);cursor:pointer;font-size:12px;}
+  #infoPanel button.danger{background:#4a2020;border-color:#7a3030;}
+  #infoPanel button:disabled{opacity:.4;cursor:not-allowed;}
+  #closeInfo{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--txt-dim);font-size:16px;background:none;border:none;}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(5,8,12,.75);display:flex;align-items:center;justify-content:center;z-index:100;}
+  .modal{background:#182130;border:1px solid var(--line);border-radius:12px;padding:22px;max-width:480px;width:90%;max-height:85vh;overflow-y:auto;}
+  .modal h2{margin-top:0;color:var(--gold);}
+  .modal .checkline{padding:3px 0;font-size:13px;}
+  .modal .ok{color:var(--good);}
+  .modal .fail{color:var(--bad);}
+  .modal button{margin-top:14px;padding:9px 16px;border-radius:6px;border:none;background:var(--gold);color:#1a1200;font-weight:700;cursor:pointer;}
+  .modal button.sec{background:var(--panel2);color:var(--txt);margin-left:8px;}
+  #toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#1e2836;border:1px solid var(--gold);padding:8px 16px;border-radius:8px;font-size:13px;z-index:200;display:none;}
+
+  /* ===== Retail Tycoon 2 style top bar ===== */
+  #topbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:12px;padding:10px 14px;background:none;}
+  .tb-side{display:flex;gap:8px;align-items:flex-start;}
+  .tb-right{justify-content:flex-end;}
+  .tb-center{display:flex;flex-direction:column;align-items:center;gap:6px;}
+  #cashPill{display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#2b3a4d,#18222f);border:3px solid #0b1118;border-radius:40px;padding:4px 26px 4px 6px;box-shadow:0 4px 0 #0b1118,0 8px 18px rgba(0,0,0,.45);}
+  #cashPill .coin{width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#7be08f,#2f9e4f);border:3px solid #0b1118;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;color:#08320f;}
+  #cashPill #s-money{font-size:30px;font-weight:900;color:#7be08f;text-shadow:0 2px 0 #0b1118;letter-spacing:.5px;min-width:130px;text-align:center;}
+  .chips{display:flex;gap:6px;}
+  .chip{background:rgba(14,20,28,.82);border:2px solid #0b1118;border-radius:14px;padding:2px 10px;font-size:12px;font-weight:700;}
+  .ibtn{width:64px;height:64px;border-radius:14px;border:3px solid #0b1118;background:linear-gradient(180deg,#3a4d66,#222f40);color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;box-shadow:0 4px 0 #0b1118,0 6px 12px rgba(0,0,0,.4);padding:0;transition:transform .08s,filter .1s;}
+  .ibtn:hover{filter:brightness(1.2);transform:translateY(-2px);}
+  .ibtn:active{transform:translateY(2px);box-shadow:0 1px 0 #0b1118;}
+  .ibtn .ic{font-size:26px;line-height:1.1;} .ibtn .lb{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;}
+  #topbar #openBtn3d{height:64px;padding:0 16px;border-radius:14px;border:3px solid #0b1118;background:linear-gradient(180deg,#52d675,#2a9a4a);color:#06280f;font-weight:900;font-size:14px;box-shadow:0 4px 0 #0b1118,0 6px 12px rgba(0,0,0,.4);cursor:pointer;}
+  #topbar #openBtn3d.closed{background:linear-gradient(180deg,#f0715f,#c2392d);color:#fff;border-color:#0b1118;}
+  #timectrl{display:flex;flex-direction:column;gap:3px;margin:0;}
+  #timectrl button{height:19px;padding:0 8px;font-size:11px;line-height:1;border:2px solid #0b1118;border-radius:8px;background:#222f40;color:#fff;cursor:pointer;}
+  #timectrl{flex-direction:row;align-self:center;}
+  #timectrl button.active{background:var(--gold);color:#1a1200;}
+  #buildMenu,#infoPanel{top:92px;}
+  #tutorialBanner{top:130px;} #toast{top:130px;}
+  @media(max-width:900px){.ibtn{width:52px;height:52px}.ibtn .ic{font-size:20px}.ibtn .lb{display:none}#cashPill #s-money{font-size:22px;min-width:90px}.chips .chip:nth-child(n+3){display:none}}
+</style>
+</head>
+<body>
+<canvas id="scene-canvas"></canvas>
+
+<div id="hud">
+  <div id="topbar">
+    <div class="tb-side tb-left">
+      <button class="ibtn" id="menuToggle"><span class="ic">🔨</span><span class="lb">Build</span></button>
+      <button class="ibtn" id="btnBoats"><span class="ic">🚤</span><span class="lb">Boats</span></button>
+      <button class="ibtn" id="btnStaff"><span class="ic">👷</span><span class="lb">Employees</span></button>
+    </div>
+    <div class="tb-center">
+      <div id="cashPill"><span class="coin">$</span><span id="s-money">$40,000</span></div>
+      <div class="chips">
+        <span class="chip stars" id="s-rating">★★★☆☆</span>
+        <span class="chip">🕒 <span id="s-clock">Day 1 — 08:00</span></span>
+        <span class="chip">👥 <span id="s-cust">0</span></span>
+        <span class="chip">⛵ <span id="s-boats">0</span></span>
+      </div>
+    </div>
+    <div class="tb-side tb-right">
+      <button id="openBtn3d">▶ OPEN STORE</button>
+      <div id="timectrl">
+        <button id="btnPause">⏸</button><button id="btnPlay" class="active">▶</button><button id="btnFast">⏩</button>
+      </div>
+      <button class="ibtn" id="gameMenuBtn"><span class="ic">⚙️</span><span class="lb">Settings</span></button>
+      <button id="btnDev" style="display:none;background:var(--bad);color:#fff;font-weight:700;">💰 DEV</button>
+    </div>
+  </div>
+  <div id="crosshair"></div>
+  <button id="stopBuildBtn">✋ Stop Building — Just Walk (Esc)</button>
+  <div id="interactPrompt"></div>
+  <div id="hint">WASD move · Space jump · Mouse look · Customers line up to pay at the Register · Walk over $ to collect · E to restock · F to drive a docked boat · Tab menu</div>
+  <div id="buildHUD"></div>
+  <div id="ticker"></div>
+</div>
+
+<div id="startOverlay">
+  <h1>🚤 WHARF TYCOON — Boat Rental</h1>
+  <p>You've leased a stretch of waterfront with $40,000 to your name. Build a car park so customers can visit, stock shelves with beach gear, build slips and buy boats to assign to them, and hire staff to help run the place — then walk it yourself and collect the cash that piles up.</p>
+  <div style="display:flex;gap:10px;margin-top:18px;">
+    <button id="tutorialYesBtn">Yes, show me the basics</button>
+    <button id="tutorialNoBtn" style="background:var(--panel2);color:var(--txt);">No, I've got this</button>
+  </div>
+  <div class="keys">
+    <div class="key"><b>WASD</b>Move</div>
+    <div class="key"><b>Mouse</b>Look around</div>
+    <div class="key"><b>Left Click</b>Place / Select / Assign</div>
+    <div class="key"><b>Right Click</b>Rotate piece</div>
+    <div class="key"><b>E</b>Restock a shelf</div>
+    <div class="key"><b>Tab</b>Open build menu</div>
+  </div>
+</div>
+<div id="tutorialBanner"></div>
+
+<div id="buildMenu">
+  <h2>Construction</h2>
+  <button id="walkAroundBtn" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--good);color:#06280f;font-weight:700;cursor:pointer;margin-bottom:10px;">🚶 Just Walk Around</button>
+  <div id="bulldozeItem">🛠 Bulldoze Mode</div>
+  <div class="catrow" id="catRow"></div>
+  <div id="itemList"></div>
+  <button id="closeMenuBtn">Close (Tab)</button>
+</div>
+
+<div id="infoPanel"><button id="closeInfo">✕</button><div id="infoContent"></div></div>
+<div id="toast"></div>
+
+<script>
+/* =========================================================================
+   WHARF TYCOON — Boat Rental (first-person, Retail-Tycoon-style)
+   Core loop: build shelves (restock manually, sell passively to walking
+   customers) + boat slips (passive rental cycle) on a waterfront plot;
+   cash piles physically appear and must be walked over to collect.
+   Data-driven building defs + generic customer state machine keep this
+   extensible (new goods, boat types, decor) without touching sim/render core.
+   ========================================================================= */
+
+const CELL = 4;
+let GRID_W = 46, GRID_H = 52;
+let OWNED_OX = 6, OWNED_OY = 6, OWNED_W = 18, OWNED_H = 36;
+
+const state = {
+  money: 40000, day: 1, timeOfDay: 8*60, speed: 1, rating: 3, isOpen: false,
+  ownedRect: {x:OWNED_OX,y:OWNED_OY,w:OWNED_W,h:OWNED_H},
+  buildings: [], nextId: 1,
+  custToday:0, boatsToday:0, lastDayCust:0, lastDayBoats:0, lastDayRevenue:0, lastDayExpense:0,
+  revenueToday:0, expenseToday:0,
+  customers: [], boats: [], staff: [], trash: [],
+  satisfactionSum:1, satisfactionCount:1,
+  spawnTimer: 0,
+  tutorial: {active:false, step:0},
+};
+
+const CATS = [
+  {key:'docks', name:'Docks'}, {key:'boats', name:'Boats'}, {key:'shelves', name:'Shelves'},
+  {key:'infra', name:'Infra'}, {key:'staff', name:'Staff'}, {key:'decor', name:'Decor'},
+];
+
+// surface: 'land' or 'water' — where the piece is allowed to be placed
+// solid: blocks walking pathfinding (customers route around it)
+const BUILDING_DEFS = {
+  pier:     {cat:'docks', name:'Wooden Pier', w:1,h:1, cost:400, desc:'Walkway over water — connects land to boat slips.', color:0x9c7a4a, kind:'pier', surface:'water', solid:false, ht:0.35, maxLevel:1},
+  slip_s:   {cat:'docks', name:'Small Slip', w:2,h:1, cost:2200, desc:'Holds a kayak-class boat. Buy a boat separately and assign it here.', color:0xffcf6b, kind:'slip', surface:'water', solid:false, ht:0.5, rank:1, maxLevel:2},
+  slip_m:   {cat:'docks', name:'Medium Slip', w:3,h:2, cost:6500, desc:'Holds a speedboat-class boat. Buy a boat separately and assign it here.', color:0x5aa0f0, kind:'slip', surface:'water', solid:false, ht:0.6, rank:2, maxLevel:2},
+  slip_l:   {cat:'docks', name:'Large Slip', w:4,h:2, cost:13000, desc:'Holds a pontoon-class boat. Buy a boat separately and assign it here.', color:0x4fd8b8, kind:'slip', surface:'water', solid:false, ht:0.7, rank:3, maxLevel:2},
+
+  shelf_snacks:{cat:'shelves', name:'Snack Shelf', w:2,h:1, cost:1500, desc:'Sells snacks. Restock (E) to keep selling.', color:0xffb84d, kind:'shelf', surface:'land', solid:true, ht:2.3, price:15, maxStock:20, restockCost:80, maxLevel:3},
+  shelf_drinks:{cat:'shelves', name:'Drink Fridge', w:1,h:1, cost:2000, desc:'Cold drinks — solid margins.', color:0x52c6e0, kind:'shelf', surface:'land', solid:true, ht:2.5, price:18, maxStock:24, restockCost:100, maxLevel:3},
+  shelf_sun:   {cat:'shelves', name:'Sunscreen Shelf', w:2,h:1, cost:1800, desc:'Every beachgoer needs this.', color:0xffe27a, kind:'shelf', surface:'land', solid:true, ht:2.3, price:22, maxStock:18, restockCost:90, maxLevel:3},
+  shelf_vest:  {cat:'shelves', name:'Life Jacket Rack', w:2,h:1, cost:3200, desc:'Safety gear — sells for more.', color:0xff6b5f, kind:'shelf', surface:'land', solid:true, ht:2.5, price:35, maxStock:15, restockCost:150, maxLevel:3},
+  shelf_fuel:  {cat:'shelves', name:'Fuel Canister Shelf', w:2,h:1, cost:4200, desc:'Boaters need fuel — big margins.', color:0xb083ea, kind:'shelf', surface:'land', solid:true, ht:2.3, price:48, maxStock:12, restockCost:200, maxLevel:3},
+  register:    {cat:'shelves', name:'Cash Register', w:1,h:1, cost:2500, desc:'Where customers pay for what they picked up from your shelves. Required to actually collect shelf sales!', color:0x50c878, kind:'register', surface:'land', solid:true, ht:1.5, maxLevel:3},
+
+  entrance: {cat:'infra', name:'Entrance Sign', w:1,h:1, cost:500, desc:'Customers arrive here. Required.', color:0xffffff, kind:'entrance', surface:'land', solid:false, ht:2.6, maxLevel:1},
+  parking_s:{cat:'infra', name:'Small Car Park', w:3,h:2, cost:3500, desc:'Customers need somewhere to park — required to draw visitors. Holds 6 cars.', color:0x8c8c5c, kind:'parking', surface:'land', solid:false, ht:0.05, cap:6, maxLevel:2},
+  parking_l:{cat:'infra', name:'Large Car Park', w:4,h:3, cost:8000, desc:'More spaces, more customers. Holds 14 cars.', color:0x7c7c50, kind:'parking', surface:'land', solid:false, ht:0.05, cap:14, maxLevel:2},
+
+  palm:     {cat:'decor', name:'Palm Tree', w:1,h:1, cost:600, desc:'Looks great, small rating boost.', color:0x4fbf4f, kind:'decor', surface:'land', solid:true, ht:2.8, maxLevel:1},
+  umbrella: {cat:'decor', name:'Beach Umbrella', w:1,h:1, cost:450, desc:'Shade for happy customers.', color:0xff8552, kind:'decor', surface:'land', solid:true, ht:1.9, maxLevel:1},
+  bench:    {cat:'decor', name:'Bench', w:1,h:1, cost:300, desc:'A place to rest. Rating boost.', color:0x8a5a34, kind:'decor', surface:'land', solid:false, ht:0.6, maxLevel:1},
+  fence:    {cat:'decor', name:'Fence Section', w:1,h:1, cost:150, desc:'Marks your property line.', color:0xd8c9a3, kind:'decor', surface:'land', solid:true, ht:1.1, maxLevel:1},
+};
+
+const BOAT_VISUAL = {
+  kayak:{len:2.6, color:0xffcf6b, hullColor:0xdca542},
+  speedboat:{len:4.6, color:0xf2f6fa, hullColor:0x3c7fc9},
+  pontoon:{len:6.2, color:0xf7f2e2, hullColor:0x2f9e5c},
+};
+
+// Boats are bought separately from slips, then assigned to a compatible slip (rank>=boat rank)
+const BOAT_DEFS = {
+  kayak:     {name:'Kayak', cost:2500, rank:1, price:65, rentMin:4, rentMax:6, desc:'Cheap, fast turnover, low fee per rental.'},
+  speedboat: {name:'Speedboat', cost:9000, rank:2, price:200, rentMin:5, rentMax:7, desc:'Needs a Medium+ slip. Bigger rental fee.'},
+  pontoon:   {name:'Pontoon Boat', cost:20000, rank:3, price:400, rentMin:6, rentMax:8, desc:'Needs a Large slip. Best fee per rental.'},
+};
+
+// Staff are hired (not grid-placed) and wander the property doing their job automatically
+const STAFF_DEFS = {
+  restocker: {name:'Restocker', cost:1200, wage:220, desc:'Automatically restocks shelves that run low, using your money for stock.', role:'restock'},
+  dockhand:  {name:'Dock Hand', cost:1500, wage:260, desc:'Speeds up boat turnaround time at slips near them.', role:'dockhand'},
+  cleaner:   {name:'Cleaner', cost:1000, wage:180, desc:'Automatically picks up litter dropped by customers.', role:'cleaner'},
+  cashier:   {name:'Cashier', cost:1400, wage:240, desc:'Automatically collects and banks cash piling up at your registers.', role:'cashier'},
+};
+const MAX_STAFF = 6;
+
+// Guided first-time tutorial: one required item per step, cheapest/smallest variant only.
+const TUTORIAL_STEPS = [
+  {cat:'infra',  key:'entrance',  label:'Build an Entrance Sign — this is where customers arrive from'},
+  {cat:'infra',  key:'parking_s', label:'Build a Small Car Park — customers need somewhere to park'},
+  {cat:'docks',  key:'slip_s',    label:'Build a Small Slip — a berth for a boat'},
+  {cat:'boats',  key:'kayak',     label:'Buy a Kayak and assign it to your slip'},
+  {cat:'shelves',key:'shelf_snacks', label:'Build a Snack Shelf — something for customers to buy'},
+  {cat:'shelves',key:'register',  label:'Build a Cash Register — where customers pay'},
+];
+
+/* ---------------- GRID ---------------- */
+let tiles = [];
+function initTiles(){ tiles=[]; for(let y=0;y<GRID_H;y++) tiles.push(new Array(GRID_W).fill(null)); }
+initTiles();
+function inBounds(x,y){ return x>=0&&y>=0&&x<GRID_W&&y<GRID_H; }
+function isOwned(x,y){ return x>=state.ownedRect.x&&y>=state.ownedRect.y&&x<state.ownedRect.x+state.ownedRect.w&&y<state.ownedRect.y+state.ownedRect.h; }
+// river position is fixed at game start so land can later expand in any direction
+// without the river shifting or resizing underneath existing docks
+const RIVER_FIXED_START = OWNED_OY + 6;
+const RIVER_FIXED_END = RIVER_FIXED_START + 24; // 3x the old 8-row river
+function riverRowStart(){ return RIVER_FIXED_START; }
+function riverRowEnd(){ return RIVER_FIXED_END; }
+function isWaterCell(x,y){ return y >= riverRowStart() && y < riverRowEnd(); }
+function kindAt(x,y){ if(!inBounds(x,y)) return null; const t=tiles[y][x]; return t?t.kind:null; }
+function neighbors(x,y){ return [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]; }
+function bfsPath(startCells, goalTest, allowed){
+  const q=[]; const visited=new Set();
+  startCells.forEach(c=>{ q.push({x:c.x,y:c.y,path:[c]}); visited.add(c.x+','+c.y); });
+  let iter=0;
+  while(q.length && iter<9000){
+    iter++;
+    const cur=q.shift();
+    if(goalTest(cur.x,cur.y)) return cur.path;
+    for(const [nx,ny] of neighbors(cur.x,cur.y)){
+      const key=nx+','+ny; if(visited.has(key)) continue;
+      if(!allowed(nx,ny)) continue;
+      visited.add(key); q.push({x:nx,y:ny,path:[...cur.path,{x:nx,y:ny}]});
+    }
+  }
+  return null;
+}
+function walkable(x,y){
+  if(!inBounds(x,y)) return false;
+  if(isWaterCell(x,y)){ const k=kindAt(x,y); return k==='pier' || k==='slip'; }
+  const k = kindAt(x,y);
+  if(!k) return true;
+  const def = Object.values(BUILDING_DEFS).find(d=>d.kind===k);
+  return def ? !def.solid : true;
+}
+function getBuildingsOfKind(kind){ return state.buildings.filter(b=>BUILDING_DEFS[b.type].kind===kind); }
+
+/* ---------------- VALIDATION ---------------- */
+function adjacentTo(b,x,y){
+  return x>=b.x-1 && x<=b.x+b.w && y>=b.y-1 && y<=b.y+b.h && !(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h);
+}
+function validateBusiness(){
+  const checks=[];
+  const entrances = getBuildingsOfKind('entrance');
+  checks.push({label:'Entrance sign exists', ok:entrances.length>0});
+  const parking = getBuildingsOfKind('parking');
+  checks.push({label:'At least one car park exists (customers need somewhere to park)', ok:parking.length>0});
+  const shelves = state.buildings.filter(b=>BUILDING_DEFS[b.type].kind==='shelf');
+  checks.push({label:'At least one shelf exists', ok:shelves.length>0});
+  const slips = getBuildingsOfKind('slip');
+  checks.push({label:'At least one boat slip exists', ok:slips.length>0});
+  const slipsWithBoats = slips.filter(s=>s.boat);
+  checks.push({label:'At least one slip has a boat assigned to it', ok:slipsWithBoats.length>0});
+  let entranceReachesShelf=false, entranceReachesSlip=false;
+  if(entrances.length){
+    const starts = entrances.map(e=>({x:e.x,y:e.y}));
+    if(shelves.length) entranceReachesShelf = !!bfsPath(starts, (x,y)=>shelves.some(s=>adjacentTo(s,x,y)), walkable);
+    if(slips.length) entranceReachesSlip = !!bfsPath(starts, (x,y)=>slips.some(s=>adjacentTo(s,x,y)), walkable);
+  }
+  checks.push({label:'Customers can walk from entrance to a shelf', ok: shelves.length>0 && entranceReachesShelf});
+  checks.push({label:'Customers can walk from entrance to a boat slip (via pier)', ok: slips.length>0 && entranceReachesSlip});
+  return checks;
+}
+
+/* =========================================================================
+   THREE.JS SCENE
+   ========================================================================= */
+const canvasEl = document.getElementById('scene-canvas');
+const renderer = new THREE.WebGLRenderer({canvas:canvasEl, antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fd3f4);
+scene.fog = new THREE.Fog(0x8fd3f4, 110, 320);
+
+// gradient skybox (deep blue overhead fading to a pale horizon) instead of a flat color, for realism
+(function buildSky(){
+  const c = document.createElement('canvas'); c.width=2; c.height=256;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0,0,0,256);
+  grad.addColorStop(0, '#3f8fd8');
+  grad.addColorStop(0.55, '#8fd3f4');
+  grad.addColorStop(1, '#e8f6ff');
+  g.fillStyle = grad; g.fillRect(0,0,2,256);
+  const tex = new THREE.CanvasTexture(c);
+  const skyGeo = new THREE.SphereGeometry(500, 24, 16);
+  const skyMat = new THREE.MeshBasicMaterial({map:tex, side:THREE.BackSide, fog:false, depthWrite:false});
+  const sky = new THREE.Mesh(skyGeo, skyMat);
+  scene.add(sky);
+})();
+
+const camera = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHeight, 0.1, 800);
+const EYE_HEIGHT = 5.2;
+camera.position.set((OWNED_OX+3)*CELL, EYE_HEIGHT, (OWNED_OY+3)*CELL);
+
+const hemi = new THREE.HemisphereLight(0xeaf6ff, 0x5a9a52, 1.05);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff6e0, 1.2);
+sun.position.set(120,160,80);
+sun.castShadow = true;
+sun.shadow.camera.left=-140; sun.shadow.camera.right=140; sun.shadow.camera.top=140; sun.shadow.camera.bottom=-140;
+sun.shadow.mapSize.set(2048,2048);
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffffff,0.35));
+const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({color:0xfff3b0, transparent:true, opacity:0.9, depthTest:false}));
+sunSprite.scale.set(30,30,1);
+scene.add(sunSprite);
+
+/* ------- textures ------- */
+function makeLawnTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=128;
+  const g=c.getContext('2d');
+  g.fillStyle='#5fbf5f'; g.fillRect(0,0,128,128);
+  for(let i=0;i<900;i++){
+    g.fillStyle = Math.random()<0.5?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.05)';
+    g.fillRect(Math.random()*128, Math.random()*128, 2,2);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  return t;
+}
+function makeWaterTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=128;
+  const g=c.getContext('2d');
+  g.fillStyle='#2f8fd0'; g.fillRect(0,0,128,128);
+  g.strokeStyle='rgba(255,255,255,0.25)'; g.lineWidth=2;
+  for(let i=0;i<10;i++){ g.beginPath(); const y=Math.random()*128; g.moveTo(0,y); g.bezierCurveTo(32,y+8,96,y-8,128,y); g.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  return t;
+}
+function makeSandTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=128;
+  const g=c.getContext('2d');
+  g.fillStyle='#dcc48a'; g.fillRect(0,0,128,128);
+  for(let i=0;i<500;i++){
+    g.fillStyle = Math.random()<0.5?'rgba(255,255,255,0.12)':'rgba(120,90,40,0.12)';
+    g.fillRect(Math.random()*128, Math.random()*128, 2,2);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  return t;
+}
+function makePierTexture(w,h){
+  const res=64; const c=document.createElement('canvas'); c.width=res*w; c.height=res*h;
+  const g=c.getContext('2d'); g.fillStyle='#9c7a4a'; g.fillRect(0,0,c.width,c.height);
+  g.strokeStyle='rgba(0,0,0,0.25)'; g.lineWidth=3;
+  for(let i=0;i<=w;i++){ g.beginPath(); g.moveTo(i*res,0); g.lineTo(i*res,c.height); g.stroke(); }
+  return new THREE.CanvasTexture(c);
+}
+const lawnTex = makeLawnTexture();
+const waterTex = makeWaterTexture();
+
+/* ------- ground: split land / water bands ------- */
+const groundGeo = new THREE.PlaneGeometry(GRID_W*CELL, GRID_H*CELL);
+const unownedMat = new THREE.MeshStandardMaterial({color:0x1e3320, roughness:1});
+const groundMesh = new THREE.Mesh(groundGeo, unownedMat);
+groundMesh.rotation.x = -Math.PI/2;
+groundMesh.position.set(GRID_W*CELL/2, -0.02, GRID_H*CELL/2);
+groundMesh.receiveShadow = true;
+scene.add(groundMesh);
+
+let landTopMesh, landBottomMesh, boundaryLine;
+let sandTopMesh, sandBottomMesh;
+function rebuildOwnedGround(){
+  [landTopMesh, landBottomMesh, boundaryLine, sandTopMesh, sandBottomMesh].forEach(m=>{ if(m) scene.remove(m); });
+  const r = state.ownedRect;
+  const rStart = riverRowStart(), rEnd = riverRowEnd();
+  const topH = rStart - r.y;
+  const bottomH = (r.y+r.h) - rEnd;
+  const sandTex = makeSandTexture();
+
+  if(topH>0){
+    const ltex = lawnTex.clone(); ltex.needsUpdate=true; ltex.repeat.set(r.w/2, Math.max(topH,1)/2);
+    landTopMesh = new THREE.Mesh(new THREE.PlaneGeometry(r.w*CELL, topH*CELL), new THREE.MeshStandardMaterial({map:ltex, roughness:1}));
+    landTopMesh.rotation.x=-Math.PI/2;
+    landTopMesh.position.set((r.x+r.w/2)*CELL, 0.01, (r.y+topH/2)*CELL);
+    landTopMesh.receiveShadow=true;
+    scene.add(landTopMesh);
+    // a thin sandy shoreline right where this land meets the river, for realism
+    const stex = sandTex.clone(); stex.needsUpdate=true; stex.repeat.set(r.w/2, 1);
+    sandTopMesh = new THREE.Mesh(new THREE.PlaneGeometry(r.w*CELL, CELL*1.1), new THREE.MeshStandardMaterial({map:stex, roughness:1}));
+    sandTopMesh.rotation.x=-Math.PI/2;
+    sandTopMesh.position.set((r.x+r.w/2)*CELL, 0.015, rStart*CELL - CELL*0.5);
+    sandTopMesh.receiveShadow=true;
+    scene.add(sandTopMesh);
+  }
+  if(bottomH>0){
+    const ltex2 = lawnTex.clone(); ltex2.needsUpdate=true; ltex2.repeat.set(r.w/2, Math.max(bottomH,1)/2);
+    landBottomMesh = new THREE.Mesh(new THREE.PlaneGeometry(r.w*CELL, bottomH*CELL), new THREE.MeshStandardMaterial({map:ltex2, roughness:1}));
+    landBottomMesh.rotation.x=-Math.PI/2;
+    landBottomMesh.position.set((r.x+r.w/2)*CELL, 0.01, (rEnd+bottomH/2)*CELL);
+    landBottomMesh.receiveShadow=true;
+    scene.add(landBottomMesh);
+    const stex2 = sandTex.clone(); stex2.needsUpdate=true; stex2.repeat.set(r.w/2, 1);
+    sandBottomMesh = new THREE.Mesh(new THREE.PlaneGeometry(r.w*CELL, CELL*1.1), new THREE.MeshStandardMaterial({map:stex2, roughness:1}));
+    sandBottomMesh.rotation.x=-Math.PI/2;
+    sandBottomMesh.position.set((r.x+r.w/2)*CELL, 0.015, rEnd*CELL + CELL*0.5);
+    sandBottomMesh.receiveShadow=true;
+    scene.add(sandBottomMesh);
+  }
+
+  const pts=[
+    new THREE.Vector3(r.x*CELL,0.1,r.y*CELL), new THREE.Vector3((r.x+r.w)*CELL,0.1,r.y*CELL),
+    new THREE.Vector3((r.x+r.w)*CELL,0.1,(r.y+r.h)*CELL), new THREE.Vector3(r.x*CELL,0.1,(r.y+r.h)*CELL),
+    new THREE.Vector3(r.x*CELL,0.1,r.y*CELL),
+  ];
+  boundaryLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color:0xe0b04a}));
+  scene.add(boundaryLine);
+}
+rebuildOwnedGround();
+
+// the river's position/size never changes (see RIVER_FIXED_*), so it only needs to be built once —
+// this also sidesteps the flat-plane wave-displacement bug that caused visible holes/flicker before
+let waterMesh;
+(function buildRiver(){
+  const rStart = riverRowStart(), rEnd = riverRowEnd();
+  const riverH = rEnd - rStart;
+  const wtex = waterTex.clone(); wtex.needsUpdate=true; wtex.repeat.set(GRID_W/3, riverH/3);
+  const wtex2 = waterTex.clone(); wtex2.needsUpdate=true; wtex2.repeat.set(GRID_W/4.5, riverH/4.5);
+  const waterGeo = new THREE.PlaneGeometry(GRID_W*CELL, riverH*CELL, 1, 1); // flat — no vertex displacement, no holes
+  const mat = new THREE.MeshStandardMaterial({map:wtex, color:0x6db8e8, roughness:0.5, metalness:0.05, transparent:false, side:THREE.DoubleSide});
+  waterMesh = new THREE.Mesh(waterGeo, mat);
+  waterMesh.rotation.x=-Math.PI/2;
+  waterMesh.position.set(GRID_W*CELL/2, 0.06, (rStart+riverH/2)*CELL); // comfortably above the ground plane, no z-fighting
+  waterMesh.receiveShadow=true;
+  scene.add(waterMesh);
+  waterMesh.userData.tex2 = wtex2;
+
+  // a second, slower-scrolling translucent highlight layer for a bit of shimmer/depth without touching geometry
+  const shineGeo = new THREE.PlaneGeometry(GRID_W*CELL, riverH*CELL, 1, 1);
+  const shineMat = new THREE.MeshBasicMaterial({map:wtex2, transparent:true, opacity:0.28, blending:THREE.AdditiveBlending, depthWrite:false});
+  const shineMesh = new THREE.Mesh(shineGeo, shineMat);
+  shineMesh.rotation.x=-Math.PI/2;
+  shineMesh.position.set(GRID_W*CELL/2, 0.07, (rStart+riverH/2)*CELL);
+  scene.add(shineMesh);
+  waterMesh.userData.shineMesh = shineMesh;
+})();
+
+function animateWater(t){
+  if(!waterMesh) return;
+  waterMesh.material.map.offset.set((t*0.03)%1, (t*0.015)%1);
+  const shine = waterMesh.userData.shineMesh;
+  if(shine){
+    shine.material.map.offset.set((-t*0.018)%1, (t*0.024)%1);
+    shine.material.opacity = 0.22 + Math.sin(t*0.6)*0.06;
+  }
+}
+
+const treeGroup = new THREE.Group(); scene.add(treeGroup);
+const treeRecords = [];
+(function scatterTrees(){
+  const trunkGeo = new THREE.CylinderGeometry(0.28,0.32,1.4,6);
+  const leafGeo = new THREE.IcosahedronGeometry(1.5, 0);
+  const trunkMat = new THREE.MeshStandardMaterial({color:0x8a5a34});
+  const leafMats = [0x4fbf4f,0x5fd45f,0x3fa83f].map(c=>new THREE.MeshStandardMaterial({color:c, flatShading:true}));
+  let count=0;
+  for(let y=0;y<GRID_H && count<120;y+=2){
+    for(let x=0;x<GRID_W && count<120;x+=2){
+      if(isOwned(x,y) || isWaterCell(x,y)) continue;
+      if(Math.random()<0.3){
+        const g = new THREE.Group();
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.position.y=0.7; trunk.castShadow=true;
+        const leaf = new THREE.Mesh(leafGeo, leafMats[Math.floor(Math.random()*leafMats.length)]);
+        leaf.position.y=2.2; leaf.scale.setScalar(0.8+Math.random()*0.35); leaf.rotation.y=Math.random()*6; leaf.castShadow=true;
+        g.add(trunk,leaf);
+        g.position.set(x*CELL+CELL/2+(Math.random()-0.5)*2, 0, y*CELL+CELL/2+(Math.random()-0.5)*2);
+        g.userData.swayPhase = Math.random()*6.28;
+        treeGroup.add(g); count++;
+        treeRecords.push({mesh:g, gx:x, gy:y});
+      }
+    }
+  }
+})();
+// if the player expands land over ground that used to have wild trees on it, clear them out
+function pruneTreesInOwnedLand(){
+  for(let i=treeRecords.length-1;i>=0;i--){
+    const rec = treeRecords[i];
+    if(isOwned(rec.gx, rec.gy)){
+      treeGroup.remove(rec.mesh);
+      treeRecords.splice(i,1);
+    }
+  }
+}
+function swayTrees(t){
+  treeRecords.forEach(rec=>{
+    rec.mesh.rotation.z = Math.sin(t*0.7 + rec.mesh.userData.swayPhase)*0.03;
+  });
+}
+
+/* ---------------- BUILDING MESHES ---------------- */
+function footprint(defKey, rot){ const d=BUILDING_DEFS[defKey]; return rot%180===90?{w:d.h,h:d.w}:{w:d.w,h:d.h}; }
+function cellToWorld(x,y){ return {x:x*CELL, z:y*CELL}; }
+function defKeyFromDef(def){ return Object.keys(BUILDING_DEFS).find(k=>BUILDING_DEFS[k]===def); }
+
+function createBuildingMesh(defKey,w,h,rotDeg){
+  const def = BUILDING_DEFS[defKey];
+  const group = new THREE.Group();
+  const worldW=w*CELL, worldH=h*CELL;
+
+  if(def.kind==='pier'){
+    const mat = new THREE.MeshStandardMaterial({map:makePierTexture(w,h), roughness:0.9});
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(worldW,0.3,worldH), mat);
+    plank.position.y=0.15; plank.castShadow=true; plank.receiveShadow=true;
+    group.add(plank);
+    const postMat = new THREE.MeshStandardMaterial({color:0x6b4a2a});
+    [[-worldW/2+0.3,-worldH/2+0.3],[worldW/2-0.3,-worldH/2+0.3],[-worldW/2+0.3,worldH/2-0.3],[worldW/2-0.3,worldH/2-0.3]].forEach(([px,pz])=>{
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,1.4,6), postMat);
+      post.position.set(px,-0.55,pz); group.add(post);
+    });
+  } else if(def.kind==='slip'){
+    const mat = new THREE.MeshStandardMaterial({map:makePierTexture(w,h), roughness:0.9});
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(worldW,0.3,worldH), mat);
+    deck.position.y=0.15; deck.castShadow=true; deck.receiveShadow=true;
+    group.add(deck);
+    const postMat = new THREE.MeshStandardMaterial({color:0x6b4a2a});
+    const postCols = Math.max(2,Math.floor(w));
+    for(let i=0;i<postCols;i++){
+      const px = -worldW/2+0.3+i*(worldW-0.6)/Math.max(1,postCols-1);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,1.6,6), postMat);
+      post.position.set(px, -0.6, -worldH/2+0.3);
+      group.add(post);
+      const post2 = post.clone(); post2.position.z = worldH/2-0.3; group.add(post2);
+    }
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(0.15,1.4,0.7), new THREE.MeshStandardMaterial({color:def.color}));
+    sign.position.set(-worldW/2+0.5, 1, 0); sign.castShadow=true;
+    group.add(sign);
+  } else if(def.kind==='register'){
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(worldW-0.2, def.ht*0.6, worldH-0.2), new THREE.MeshStandardMaterial({color:def.color}));
+    counter.position.y = def.ht*0.3; counter.castShadow=true; counter.receiveShadow=true;
+    group.add(counter);
+    const till = new THREE.Mesh(new THREE.BoxGeometry(worldW*0.4,0.35,worldH*0.5), new THREE.MeshStandardMaterial({color:0x2a2a2a}));
+    till.position.set(0, def.ht*0.6+0.18, 0); till.castShadow=true;
+    group.add(till);
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(worldW*0.18,0.25,0.05), new THREE.MeshStandardMaterial({color:0x8ef0f0, emissive:0x2a6a6a, emissiveIntensity:0.5}));
+    screen.position.set(0, def.ht*0.6+0.5, worldH*0.2); screen.rotation.x=-0.3;
+    group.add(screen);
+  } else if(def.kind==='shelf'){
+    // real-shelf silhouette: back panel + side panels, with tiers that step BACK as they go up
+    // (bottom tier protrudes furthest toward the customer, top tier is set back) so stock is easy to see at a glance
+    const unitH = Math.max(def.ht, 2.2);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(worldW-0.2, unitH, 0.15), new THREE.MeshStandardMaterial({color:def.color}));
+    back.position.set(0, unitH/2, -worldH/2+0.1); back.castShadow=true; back.receiveShadow=true;
+    group.add(back);
+    const sideMat = new THREE.MeshStandardMaterial({color:def.color});
+    [-1,1].forEach(sideSign=>{
+      const side = new THREE.Mesh(new THREE.BoxGeometry(0.15, unitH, worldH-0.2), sideMat);
+      side.position.set(sideSign*(worldW/2-0.1), unitH/2, 0); side.castShadow=true;
+      group.add(side);
+    });
+    const frontZ = worldH/2 - 0.15; // the very front edge (nearest the approaching customer), shared reference
+    const tiers = [
+      {y: unitH*0.30, depthFrac: 1.0,  step: 0},
+      {y: unitH*0.60, depthFrac: 0.74, step: 0.35},
+      {y: unitH*0.90, depthFrac: 0.5,  step: 0.7},
+    ];
+    tiers.forEach(tdef=>{
+      const depth = (worldH-0.3)*tdef.depthFrac;
+      const tierFrontZ = frontZ - tdef.step;
+      const tier = new THREE.Mesh(new THREE.BoxGeometry(worldW-0.3, 0.1, depth), new THREE.MeshStandardMaterial({color:0x6b5638}));
+      tier.position.set(0, tdef.y, tierFrontZ - depth/2); tier.castShadow=true; tier.receiveShadow=true;
+      group.add(tier);
+      tdef._z = tierFrontZ - depth/2; tdef._depth = depth;
+    });
+    group.userData.goodsSlots = [];
+    const cols = Math.max(1,Math.floor(worldW/1.1));
+    [tiers[0], tiers[1]].forEach(tdef=>{
+      for(let i=0;i<cols;i++){
+        const good = new THREE.Mesh(new THREE.BoxGeometry(0.65,0.5,Math.max(0.4,tdef._depth*0.55)), new THREE.MeshStandardMaterial({color:0xffffff}));
+        good.position.set(-worldW/2+0.7+i*(worldW-1.4)/Math.max(1,cols-1||1), tdef.y+0.3, tdef._z);
+        good.castShadow=true;
+        group.add(good);
+        group.userData.goodsSlots.push(good);
+      }
+    });
+  } else if(def.kind==='entrance'){
+    const postMat = new THREE.MeshStandardMaterial({color:0xffffff});
+    const postL = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,def.ht,6), postMat); postL.position.set(-worldW/2+0.2,def.ht/2,0); group.add(postL);
+    const postR = postL.clone(); postR.position.x = worldW/2-0.2; group.add(postR);
+    const banner = new THREE.Mesh(new THREE.BoxGeometry(worldW, 0.5, 0.15), new THREE.MeshStandardMaterial({color:0xffd35c}));
+    banner.position.set(0, def.ht*0.85, 0); banner.castShadow=true;
+    group.add(banner);
+  } else if(def.kind==='parking'){
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(worldW,worldH), new THREE.MeshStandardMaterial({color:0x888868}));
+    plane.rotation.x=-Math.PI/2; plane.position.y=0.02; plane.receiveShadow=true;
+    group.add(plane);
+    // painted parking spots + an entry/exit lane on the far edge, for decorative cars
+    const cols = w, rows = h;
+    const usableRows = rows>1 ? rows-1 : 1;
+    const colW = worldW/cols, rowH = worldH/rows;
+    const laneLocalZ = worldH/2 + 1.4; // just outside the lot — where cars appear/vanish
+    const spots = [];
+    spotLoop:
+    for(let r=0;r<usableRows;r++){
+      for(let c=0;c<cols;c++){
+        if(spots.length>=def.cap) break spotLoop;
+        const sx = -worldW/2 + (c+0.5)*colW;
+        const sz = -worldH/2 + (r+0.5)*rowH;
+        spots.push({x:sx, z:sz, entryX:sx, entryZ:laneLocalZ});
+        const hw = colW*0.38, hh = rowH*0.42;
+        const pts = [
+          new THREE.Vector3(sx-hw,0.035,sz-hh), new THREE.Vector3(sx+hw,0.035,sz-hh),
+          new THREE.Vector3(sx+hw,0.035,sz+hh), new THREE.Vector3(sx-hw,0.035,sz+hh),
+          new THREE.Vector3(sx-hw,0.035,sz-hh)
+        ];
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+        const lineMat = new THREE.LineBasicMaterial({color:0xffffff, transparent:true, opacity:0.85});
+        group.add(new THREE.Line(lineGeo, lineMat));
+      }
+    }
+    group.userData.parkingSpots = spots;
+  } else if(def.kind==='decor'){
+    const key = defKeyFromDef(def);
+    if(key==='palm'){
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.28,2.0,6), new THREE.MeshStandardMaterial({color:0x8a5a34}));
+      trunk.position.y=1.0; trunk.castShadow=true; group.add(trunk);
+      const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2,0), new THREE.MeshStandardMaterial({color:0x4fbf4f, flatShading:true}));
+      leaf.position.y=2.4; leaf.castShadow=true; group.add(leaf);
+    } else if(key==='umbrella'){
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,1.8,6), new THREE.MeshStandardMaterial({color:0xdddddd}));
+      pole.position.y=0.9; group.add(pole);
+      const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.3,0.9,10), new THREE.MeshStandardMaterial({color:def.color}));
+      canopy.position.y=1.9; canopy.castShadow=true; group.add(canopy);
+    } else if(key==='bench'){
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(worldW-0.3,0.15,0.7), new THREE.MeshStandardMaterial({color:def.color}));
+      seat.position.y=0.5; seat.castShadow=true; group.add(seat);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(worldW-0.3,0.5,0.1), new THREE.MeshStandardMaterial({color:def.color}));
+      back.position.set(0,0.75,-0.3); group.add(back);
+    } else {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(worldW-0.1, def.ht, 0.15), new THREE.MeshStandardMaterial({color:def.color}));
+      post.position.y=def.ht/2; post.castShadow=true; group.add(post);
+    }
+  } else {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(worldW-0.25, def.ht, worldH-0.25), new THREE.MeshStandardMaterial({color:def.color}));
+    box.position.y = def.ht/2; box.castShadow=true; box.receiveShadow=true;
+    group.add(box);
+  }
+  group.rotation.y = -rotDeg*Math.PI/180;
+  return group;
+}
+
+const buildingMeshGroup = new THREE.Group(); scene.add(buildingMeshGroup);
+
+function canPlace(defKey,x,y,rot){
+  const def = BUILDING_DEFS[defKey];
+  const {w,h} = footprint(defKey, rot);
+  if(x<0||y<0||x+w>GRID_W||y+h>GRID_H) return false;
+  for(let dy=0;dy<h;dy++) for(let dx=0;dx<w;dx++){
+    const cx=x+dx, cy=y+dy;
+    if(!isOwned(cx,cy)) return false;
+    if(tiles[cy][cx]) return false;
+    const water = isWaterCell(cx,cy);
+    if(def.surface==='water' && !water) return false;
+    if(def.surface==='land' && water) return false;
+  }
+  return true;
+}
+function placeBuilding(defKey,x,y,rot){
+  const def = BUILDING_DEFS[defKey];
+  if(state.money<def.cost){ toast('Not enough money!'); return false; }
+  const {w,h} = footprint(defKey, rot);
+  if(!canPlace(defKey,x,y,rot)) return false;
+  const b = {id:state.nextId++, type:defKey, x,y,w,h,rot,level:1};
+  if(def.kind==='shelf'){ b.stock = def.maxStock; b.pendingCash=0; }
+  if(def.kind==='slip'){ b.boat=null; b.pendingCash=0; }
+  if(def.kind==='parking'){ b.occupied=0; b.parkCars=[]; b.carSpawnTimer=1+Math.random()*3; }
+  state.buildings.push(b);
+  for(let dy=0;dy<h;dy++) for(let dx=0;dx<w;dx++) tiles[y+dy][x+dx]={id:b.id,kind:def.kind};
+  const mesh = createBuildingMesh(defKey, def.w, def.h, rot);
+  const c = cellToWorld(x+w/2,y+h/2);
+  mesh.position.set(c.x,0,c.z);
+  mesh.scale.set(0.05,0.05,0.05);
+  mesh.userData.popStart = performance.now();
+  buildingMeshGroup.add(mesh);
+  b.mesh = mesh;
+  state.money -= def.cost; state.expenseToday += def.cost;
+  spawnFxPopup(c.x, 2, c.z, null, '✔');
+  updateShelfVisual(b);
+  advanceTutorial(defKey);
+  return true;
+}
+function removeBuilding(b){
+  for(let dy=0;dy<b.h;dy++) for(let dx=0;dx<b.w;dx++) if(inBounds(b.x+dx,b.y+dy)) tiles[b.y+dy][b.x+dx]=null;
+  if(b.mesh) buildingMeshGroup.remove(b.mesh);
+  if(b.pileMesh) scene.remove(b.pileMesh);
+  if(b.dockedBoatMesh) scene.remove(b.dockedBoatMesh);
+  if(b.parkCars) b.parkCars.forEach(c=>scene.remove(c.mesh));
+  if(driving===b){ driving=null; }
+  state.buildings = state.buildings.filter(o=>o!==b);
+}
+
+/* ---------------- PLACEMENT PREVIEW ---------------- */
+let buildMode=null, buildRot=0, bulldozeMode=false, selectedBuilding=null, assignBoatMode=null;
+let previewMesh=null, hoverCell=null;
+function setPreview(defKey){
+  if(previewMesh){ scene.remove(previewMesh); previewMesh=null; }
+  if(!defKey) return;
+  const def = BUILDING_DEFS[defKey];
+  // build the real mesh so the ghost shows the actual shape (shelf, gate, slip, etc.), not a generic block
+  previewMesh = createBuildingMesh(defKey, def.w, def.h, buildRot);
+  previewMesh.traverse(obj=>{
+    if(obj.isMesh){
+      obj.material = new THREE.MeshBasicMaterial({color:0x7adf8c, transparent:true, opacity:0.5, depthWrite:false});
+      obj.castShadow=false; obj.receiveShadow=false;
+    } else if(obj.isLine){
+      obj.material = new THREE.LineBasicMaterial({color:0x7adf8c, transparent:true, opacity:0.6});
+    }
+  });
+  scene.add(previewMesh);
+}
+function updatePreview(){
+  if(assignBoatMode){
+    if(previewMesh){ scene.remove(previewMesh); previewMesh=null; }
+    return;
+  }
+  if(buildMode && !previewMesh){ setPreview(buildMode); } // self-heal if the ghost mesh ever got orphaned
+  if(!previewMesh || !hoverCell || !buildMode) return;
+  const {w,h} = footprint(buildMode, buildRot);
+  const ok = canPlace(buildMode, hoverCell.x, hoverCell.y, buildRot);
+  const tint = ok?0x7adf8c:0xe05a4f;
+  previewMesh.traverse(obj=>{ if(obj.material && obj.material.color) obj.material.color.set(tint); });
+  const c = cellToWorld(hoverCell.x+w/2, hoverCell.y+h/2);
+  previewMesh.position.set(c.x, 0, c.z);
+}
+function slipCompatible(slip, boatKey){
+  const def = BUILDING_DEFS[slip.type];
+  return def.kind==='slip' && !slip.boat && def.rank>=BOAT_DEFS[boatKey].rank;
+}
+let slipHighlightMesh=null;
+function updateSlipHighlight(){
+  if(!assignBoatMode || !hoverCell){
+    if(slipHighlightMesh) slipHighlightMesh.visible=false;
+    return;
+  }
+  if(!slipHighlightMesh){
+    slipHighlightMesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshBasicMaterial({color:0x7adf8c, transparent:true, opacity:0.5}));
+    scene.add(slipHighlightMesh);
+  }
+  const b = buildingAtCell(hoverCell.x,hoverCell.y);
+  if(b && BUILDING_DEFS[b.type].kind==='slip'){
+    const ok = slipCompatible(b, assignBoatMode);
+    slipHighlightMesh.material.color.set(ok?0x7adf8c:0xe05a4f);
+    slipHighlightMesh.scale.set(b.w*CELL, 1.2, b.h*CELL);
+    const c = cellToWorld(b.x+b.w/2,b.y+b.h/2);
+    slipHighlightMesh.position.set(c.x,0.8,c.z);
+    slipHighlightMesh.visible = true;
+  } else {
+    slipHighlightMesh.visible = false;
+  }
+}
+
+/* ---------------- SHELF VISUAL STOCK FEEDBACK ---------------- */
+function updateShelfVisual(b){
+  const def = BUILDING_DEFS[b.type];
+  if(def.kind!=='shelf' || !b.mesh || !b.mesh.userData.goodsSlots) return;
+  const ratio = b.stock/def.maxStock;
+  const slots = b.mesh.userData.goodsSlots;
+  const filled = Math.round(ratio*slots.length);
+  slots.forEach((s,i)=>{ s.visible = i<filled; });
+}
+
+/* ---------------- CASH PILES (walk-to-collect) ---------------- */
+function makeMoneyTag(amount){
+  const c = document.createElement('canvas'); c.width=200; c.height=90;
+  const g = c.getContext('2d');
+  g.font='bold 40px sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+  g.lineWidth=7; g.strokeStyle='rgba(0,0,0,0.5)'; g.strokeText('$'+Math.floor(amount).toLocaleString(),100,45);
+  g.fillStyle='#8ef0a8'; g.fillText('$'+Math.floor(amount).toLocaleString(),100,45);
+  const tex = new THREE.CanvasTexture(c);
+  return new THREE.SpriteMaterial({map:tex, transparent:true});
+}
+function addPendingCash(b, amount, worldX, worldZ){
+  b.pendingCash = (b.pendingCash||0) + amount;
+  if(!b.pileMesh){
+    const spr = new THREE.Sprite(makeMoneyTag(b.pendingCash));
+    spr.scale.set(2.6,1.2,1);
+    spr.position.set(worldX, 2.6, worldZ);
+    scene.add(spr);
+    b.pileMesh = spr;
+    b.pileBaseY = 2.6;
+  } else {
+    b.pileMesh.material.map.dispose();
+    b.pileMesh.material = makeMoneyTag(b.pendingCash);
+  }
+}
+function collectPendingCash(b){
+  if(!b.pendingCash) return;
+  state.money += b.pendingCash;
+  state.revenueToday += b.pendingCash;
+  spawnFxPopup(b.pileMesh.position.x, b.pileMesh.position.y+0.5, b.pileMesh.position.z, b.pendingCash);
+  scene.remove(b.pileMesh);
+  b.pileMesh=null; b.pendingCash=0;
+}
+function updatePiles(t){
+  state.buildings.forEach(b=>{
+    if(b.pileMesh){ b.pileMesh.position.y = b.pileBaseY + Math.sin(t*2+b.id)*0.15; }
+  });
+}
+
+/* ---------------- TRASH / LITTER ---------------- */
+let trashId=1;
+function makeTrashMesh(){
+  const g = new THREE.Group();
+  const colors=[0xd8d8d8, 0xc9a24a, 0xff8552, 0x8ec6e0];
+  const wrapper = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28,0), new THREE.MeshStandardMaterial({color:colors[Math.floor(Math.random()*colors.length)], flatShading:true}));
+  wrapper.position.y=0.18; wrapper.castShadow=true;
+  wrapper.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6);
+  g.add(wrapper);
+  return g;
+}
+function spawnTrash(gx,gy){
+  if(state.trash.length>=40) return; // cap for performance
+  const mesh = makeTrashMesh();
+  const wx = gx*CELL + CELL*0.5 + (Math.random()-0.5)*CELL*0.8;
+  const wz = gy*CELL + CELL*0.5 + (Math.random()-0.5)*CELL*0.8;
+  mesh.position.set(wx,0,wz);
+  scene.add(mesh);
+  state.trash.push({id:trashId++, mesh, x:wx, z:wz});
+}
+function removeTrash(t){
+  scene.remove(t.mesh);
+  state.trash = state.trash.filter(x=>x!==t);
+}
+function updateTrashCollection(){
+  if(!pointerLocked) return;
+  for(const t of [...state.trash]){
+    const d = Math.hypot(t.mesh.position.x-camera.position.x, t.mesh.position.z-camera.position.z);
+    if(d<2.6){
+      spawnFxPopup(t.mesh.position.x, 1.2, t.mesh.position.z, null, 'Cleaned!');
+      removeTrash(t);
+    }
+  }
+}
+
+/* ---------------- FX POPUPS (rising fade text) ---------------- */
+const fxPopups = [];
+function makeTextSprite(text, color){
+  const c = document.createElement('canvas'); c.width=256; c.height=96;
+  const g = c.getContext('2d');
+  g.font='bold 46px sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+  g.lineWidth=8; g.strokeStyle='rgba(0,0,0,0.55)'; g.strokeText(text,128,52);
+  g.fillStyle=color; g.fillText(text,128,52);
+  const tex = new THREE.CanvasTexture(c);
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false}));
+  spr.scale.set(4.5,1.7,1);
+  return spr;
+}
+function spawnFxPopup(x,y,z,amount,customText){
+  const text = customText || ('+$'+Math.floor(amount).toLocaleString());
+  const color = customText ? '#8ef0a8' : '#ffe27a';
+  const spr = makeTextSprite(text, color);
+  spr.position.set(x,y,z);
+  scene.add(spr);
+  fxPopups.push({mesh:spr, life:0, maxLife:1.3});
+}
+function updateFxPopups(dt){
+  for(const p of [...fxPopups]){
+    p.life += dt;
+    p.mesh.position.y += dt*1.6;
+    p.mesh.material.opacity = Math.max(0, 1-(p.life/p.maxLife));
+    if(p.life>=p.maxLife){ scene.remove(p.mesh); fxPopups.splice(fxPopups.indexOf(p),1); }
+  }
+}
+function updateBuildingPops(){
+  buildingMeshGroup.children.forEach(mesh=>{
+    if(mesh.userData.popStart!==undefined){
+      const t = Math.min(1, (performance.now()-mesh.userData.popStart)/280);
+      const s = t<1 ? 1 - Math.pow(1-t,3)*Math.cos(t*Math.PI*1.4) : 1;
+      const scale = Math.max(0.05, 0.3+0.7*s);
+      mesh.scale.set(scale,scale,scale);
+      if(t>=1){ mesh.scale.set(1,1,1); delete mesh.userData.popStart; }
+    }
+  });
+}
+
+/* ---------------- BOATS ---------------- */
+function createBoatMesh(type){
+  const v = BOAT_VISUAL[type];
+  const g = new THREE.Group();
+  // built with the long axis along local Z (our forward convention is +Z at yaw=0)
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(v.len*0.42, 0.6, v.len), new THREE.MeshStandardMaterial({color:v.hullColor}));
+  hull.position.y=0.4; hull.castShadow=true;
+  g.add(hull);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(v.len*0.34, 0.2, v.len*0.8), new THREE.MeshStandardMaterial({color:v.color}));
+  deck.position.y=0.72; g.add(deck);
+  if(type!=='kayak'){
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(v.len*0.3, 0.55, v.len*0.28), new THREE.MeshStandardMaterial({color:0xffffff}));
+    cabin.position.set(0,1.05,v.len*0.05); cabin.castShadow=true; g.add(cabin);
+  }
+  return g;
+}
+function isClearWaterWorld(wx,wz){
+  const gx=Math.floor(wx/CELL), gy=Math.floor(wz/CELL);
+  if(!inBounds(gx,gy)) return false;
+  if(!isWaterCell(gx,gy)) return false;
+  return !tiles[gy][gx]; // open water, not a pier/slip deck
+}
+// where a boat floats when docked: just off the slip's outer edge, in clear water
+function slipDockPos(slip){
+  const cx = (slip.x+slip.w/2)*CELL;
+  const minZ = (riverRowStart()+0.8)*CELL, maxZ = (riverRowEnd()-0.8)*CELL;
+  let cz = (slip.y+slip.h)*CELL + 1.0; // just off the dock's edge, close alongside it
+  if(cz>maxZ) cz = (slip.y)*CELL - 1.0; // if no room south, float on the north side instead
+  cz = Math.min(maxZ, Math.max(minZ, cz));
+  let pos = {x:cx, z:cz};
+  if(!isClearWaterWorld(pos.x,pos.z)){
+    // nudge along X until we find clear water beside the slip
+    for(let i=1;i<=6;i++){
+      const tryPos = {x:cx+i*1.4, z:cz};
+      if(isClearWaterWorld(tryPos.x,tryPos.z)){ pos=tryPos; break; }
+      const tryPos2 = {x:cx-i*1.4, z:cz};
+      if(isClearWaterWorld(tryPos2.x,tryPos2.z)){ pos=tryPos2; break; }
+    }
+  }
+  return pos;
+}
+// our slip footprints are always wider than they are deep, so a boat resting alongside one
+// should lie with its length running sideways (parallel to the dock edge), not pointing out into the river
+const DOCK_PARK_YAW = Math.PI/2;
+function pickClearWaypoint(cx,cz,minX,maxX,minZ,maxZ,radius){
+  for(let i=0;i<10;i++){
+    const x = Math.min(maxX, Math.max(minX, cx + (Math.random()-0.5)*2*radius));
+    const z = Math.min(maxZ, Math.max(minZ, cz + (Math.random()-0.5)*(maxZ-minZ)));
+    if(isClearWaterWorld(x,z)) return {x,z};
+  }
+  return {x:cx, z:cz};
+}
+
+/* ---- Boat navigation: A* over open-water cells + line-of-sight smoothing + steering ---- */
+const BOAT_SPEED = {kayak:8, speedboat:12, pontoon:9};
+function navClear(gx,gy){ return inBounds(gx,gy) && isWaterCell(gx,gy) && !tiles[gy][gx]; }
+function lineClear(ax,az,bx,bz){
+  const d=Math.hypot(bx-ax,bz-az); if(d<0.01) return true;
+  const n=Math.ceil(d), px=-(bz-az)/d*1.4, pz=(bx-ax)/d*1.4;
+  for(let i=0;i<=n;i++){
+    const x=ax+(bx-ax)*i/n, z=az+(bz-az)*i/n;
+    if(!isClearWaterWorld(x,z)||!isClearWaterWorld(x+px,z+pz)||!isClearWaterWorld(x-px,z-pz)) return false;
+  }
+  return true;
+}
+function findBoatPath(sx,sz,tx,tz){
+  const S={x:Math.floor(sx/CELL),y:Math.floor(sz/CELL)}, G={x:Math.floor(tx/CELL),y:Math.floor(tz/CELL)};
+  if(!navClear(G.x,G.y)) return null;
+  const key=(x,y)=>y*GRID_W+x, open=[{x:S.x,y:S.y,g:0,f:0}], came=new Map(), gs=new Map([[key(S.x,S.y),0]]), closed=new Set();
+  const D=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  while(open.length){
+    let bi=0; for(let i=1;i<open.length;i++) if(open[i].f<open[bi].f) bi=i;
+    const cur=open.splice(bi,1)[0], ck=key(cur.x,cur.y);
+    if(closed.has(ck)) continue; closed.add(ck);
+    if(cur.x===G.x&&cur.y===G.y){
+      const pts=[]; let k=ck;
+      while(k!==undefined){ pts.push({x:((k%GRID_W)+0.5)*CELL, z:(Math.floor(k/GRID_W)+0.5)*CELL}); k=came.get(k); }
+      pts.reverse(); pts[0]={x:sx,z:sz}; pts[pts.length-1]={x:tx,z:tz};
+      const out=[pts[0]]; let i=0;
+      while(i<pts.length-1){ let j=pts.length-1; while(j>i+1 && !lineClear(pts[i].x,pts[i].z,pts[j].x,pts[j].z)) j--; out.push(pts[j]); i=j; }
+      out.shift(); return out;
+    }
+    for(const [dx,dy] of D){
+      const nx=cur.x+dx, ny=cur.y+dy; if(!navClear(nx,ny)) continue;
+      if(dx&&dy&&(!navClear(cur.x+dx,cur.y)||!navClear(cur.x,cur.y+dy))) continue;
+      const ng=cur.g+(dx&&dy?1.414:1), nk=key(nx,ny);
+      if(ng<(gs.get(nk)??Infinity)){ gs.set(nk,ng); came.set(nk,ck); const ex=Math.abs(nx-G.x), ey=Math.abs(ny-G.y); open.push({x:nx,y:ny,g:ng,f:ng+Math.max(ex,ey)+0.414*Math.min(ex,ey)}); }
+    }
+  }
+  return null;
+}
+function pickWanderTarget(){
+  const r0=riverRowStart()+1, r1=riverRowEnd()-2;
+  for(let i=0;i<30;i++){
+    const gx=2+Math.floor(Math.random()*(GRID_W-4)), gy=r0+Math.floor(Math.random()*(r1-r0+1));
+    if(navClear(gx,gy)) return {x:(gx+0.5)*CELL, z:(gy+0.5)*CELL};
+  }
+  return null;
+}
+function planBoat(bt,tx,tz){
+  const p=findBoatPath(bt.mesh.position.x,bt.mesh.position.z,tx,tz);
+  bt.path = p || [{x:tx,z:tz}]; bt.pi=0;
+  return !!p;
+}
+function launchBoat(slip){
+  const boat = slip.boat; if(!boat) return;
+  const dock = slipDockPos(slip);
+  if(slip.dockedBoatMesh){ scene.remove(slip.dockedBoatMesh); slip.dockedBoatMesh=null; }
+  const mesh = createBoatMesh(boat.type);
+  mesh.position.set(dock.x, 0.3, dock.z); mesh.rotation.y = DOCK_PARK_YAW; scene.add(mesh);
+  let duration = boat.rentMin + Math.random()*(boat.rentMax-boat.rentMin);
+  if(slip.dockhandBoost) duration *= 0.7;
+  const bt={slipId:slip.id, mesh, t:0, duration, phase:'out', path:[], pi:0, yaw:DOCK_PARK_YAW, speed:BOAT_SPEED[boat.type]||9, dockX:dock.x, dockZ:dock.z, repath:0};
+  const w=pickWanderTarget(); if(w) planBoat(bt,w.x,w.z); else bt.phase='home';
+  if(bt.phase==='home') planBoat(bt,dock.x,dock.z);
+  state.boats.push(bt);
+  slip.boatOut = true;
+  logFlightEvent(`A ${boat.type} just launched from Slip #${slip.id}`);
+}
+function updateBoats(dt,t){
+  for(const bt of [...state.boats]){
+    bt.t += dt; bt.repath -= dt;
+    const m=bt.mesh, p=m.position;
+    if(bt.phase==='out' && bt.t>=bt.duration*0.7){ bt.phase='home'; planBoat(bt,bt.dockX,bt.dockZ); }
+    let tgt=bt.path[bt.pi];
+    // re-plan if the player built something across our route
+    if(tgt && bt.repath<=0){ bt.repath=1; if(!isClearWaterWorld(tgt.x,tgt.z) && !(bt.phase==='home'&&bt.pi===bt.path.length-1)){ const g=bt.phase==='home'?{x:bt.dockX,z:bt.dockZ}:pickWanderTarget(); if(g) planBoat(bt,g.x,g.z); tgt=bt.path[bt.pi]; } }
+    if(tgt){
+      const dx=tgt.x-p.x, dz=tgt.z-p.z, dist=Math.hypot(dx,dz);
+      let diff=Math.atan2(dx,dz)-bt.yaw; while(diff>Math.PI) diff-=2*Math.PI; while(diff<-Math.PI) diff+=2*Math.PI;
+      bt.yaw += Math.max(-1.8*dt, Math.min(1.8*dt, diff));
+      let spd = bt.speed*Math.max(0.3, 1-Math.abs(diff)/Math.PI);
+      // yield to boats ahead (lower slip id has right of way, so no deadlocks)
+      for(const o of state.boats){ if(o===bt) continue; const ox=o.mesh.position.x-p.x, oz=o.mesh.position.z-p.z, od=Math.hypot(ox,oz);
+        if(od<7 && (ox*Math.sin(bt.yaw)+oz*Math.cos(bt.yaw))/(od||1)>0.5 && (o.slipId<bt.slipId||od<2.5)) spd*=0.2; }
+      const step=Math.min(dist, spd*dt);
+      p.x += Math.sin(bt.yaw)*step; p.z += Math.cos(bt.yaw)*step;
+      if(dist<1.5 || step>=dist){
+        bt.pi++;
+        if(bt.pi>=bt.path.length){
+          if(bt.phase==='out'){ const w=pickWanderTarget(); if(w) planBoat(bt,w.x,w.z); else bt.path=[]; }
+          else { bt.t=bt.duration+1; }
+        }
+      }
+    } else if(bt.phase==='out'){ bt.phase='home'; planBoat(bt,bt.dockX,bt.dockZ); }
+    p.y = 0.3+Math.sin(t*3+bt.slipId)*0.08;
+    m.rotation.y = bt.yaw; m.rotation.z = Math.sin(t*3+bt.slipId)*0.05;
+    if(bt.phase==='home' && bt.pi>=bt.path.length && bt.t>=bt.duration){
+      scene.remove(m);
+      state.boats = state.boats.filter(x=>x!==bt);
+      const slip = state.buildings.find(b=>b.id===bt.slipId);
+      if(slip && slip.boat){
+        slip.boatOut = false;
+        const c = cellToWorld(slip.x+slip.w/2, slip.y+slip.h/2);
+        addPendingCash(slip, slip.boat.price, c.x, c.z);
+        state.boatsToday++;
+        dockBoatVisual(slip);
+      }
+    }
+  }
+}
+function dockBoatVisual(slip){
+  if(slip.dockedBoatMesh) return;
+  if(!slip.boat) return;
+  const mesh = createBoatMesh(slip.boat.type);
+  const dock = slipDockPos(slip);
+  mesh.position.set(dock.x, 0.3, dock.z);
+  mesh.rotation.y = DOCK_PARK_YAW;
+  scene.add(mesh);
+  slip.dockedBoatMesh = mesh;
+}
+function updateDockedBoats(t){
+  state.buildings.forEach(b=>{
+    if(b.dockedBoatMesh){
+      b.dockedBoatMesh.position.y = 0.3 + Math.sin(t*1.6+b.id)*0.06;
+      b.dockedBoatMesh.rotation.z = Math.sin(t*1.4+b.id)*0.03;
+    }
+  });
+}
+
+/* ---------------- DECORATIVE CAR PARK TRAFFIC ---------------- */
+const CAR_COLORS = [0xd44b4b,0x4b7ed4,0xe0b04a,0x6fc26f,0xd4d4d4,0x8a5ac2,0xe08a3f,0x4a4a52];
+function createCarMesh(){
+  const g = new THREE.Group();
+  const color = CAR_COLORS[Math.floor(Math.random()*CAR_COLORS.length)];
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.0,0.5,1.9), new THREE.MeshStandardMaterial({color, transparent:true}));
+  body.position.y=0.35; body.castShadow=true; g.add(body);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.4,1.0), new THREE.MeshStandardMaterial({color:0xdfeeff, transparent:true, opacity:0.85}));
+  cabin.position.set(0,0.72,-0.1); cabin.castShadow=true; g.add(cabin);
+  const wheelGeo = new THREE.CylinderGeometry(0.22,0.22,0.2,8);
+  const wheelMat = new THREE.MeshStandardMaterial({color:0x1c1c1c, transparent:true});
+  [[-0.5,0.63],[0.5,0.63],[-0.5,-0.63],[0.5,-0.63]].forEach(([wx,wz])=>{
+    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+    wheel.rotation.z = Math.PI/2;
+    wheel.position.set(wx,0.2,wz);
+    g.add(wheel);
+  });
+  return g;
+}
+function setCarOpacity(mesh, op){ mesh.traverse(o=>{ if(o.material) o.material.opacity=op; }); }
+const CAR_ENTER_DUR = 1.4, CAR_EXIT_DUR = 1.4;
+function updateParkingCars(dt){
+  if(dt<=0) return;
+  state.buildings.forEach(b=>{
+    const def = BUILDING_DEFS[b.type];
+    if(def.kind!=='parking' || !b.mesh || !b.mesh.userData.parkingSpots) return;
+    const spots = b.mesh.userData.parkingSpots;
+    if(!spots.length) return;
+    b.parkCars = b.parkCars || [];
+    b.carSpawnTimer = (b.carSpawnTimer==null ? 1+Math.random()*3 : b.carSpawnTimer) - dt;
+    const usedSpots = new Set(b.parkCars.map(c=>c.spotIdx));
+    if(b.carSpawnTimer<=0 && usedSpots.size<spots.length){
+      let idx;
+      do{ idx = Math.floor(Math.random()*spots.length); } while(usedSpots.has(idx));
+      const mesh = createCarMesh();
+      scene.add(mesh);
+      b.parkCars.push({mesh, spotIdx:idx, stage:'entering', t:0});
+      b.carSpawnTimer = 2+Math.random()*4;
+    }
+    for(const car of [...b.parkCars]){
+      const spot = spots[car.spotIdx];
+      const entryWorld = b.mesh.localToWorld(new THREE.Vector3(spot.entryX,0.3,spot.entryZ));
+      const spotWorld = b.mesh.localToWorld(new THREE.Vector3(spot.x,0.3,spot.z));
+      if(car.stage==='entering'){
+        car.t += dt/CAR_ENTER_DUR;
+        const tt = Math.min(1,car.t);
+        car.mesh.position.lerpVectors(entryWorld, spotWorld, tt);
+        car.mesh.rotation.y = b.mesh.rotation.y;
+        setCarOpacity(car.mesh, Math.min(1, tt*2));
+        if(tt>=1){ car.stage='parked'; car.t=0; car.dwell=4+Math.random()*8; }
+      } else if(car.stage==='parked'){
+        car.dwell -= dt;
+        if(car.dwell<=0){ car.stage='exiting'; car.t=0; }
+      } else if(car.stage==='exiting'){
+        car.t += dt/CAR_EXIT_DUR;
+        const tt = Math.min(1,car.t);
+        car.mesh.position.lerpVectors(spotWorld, entryWorld, tt);
+        setCarOpacity(car.mesh, Math.max(0,1-tt));
+        if(tt>=1){ scene.remove(car.mesh); b.parkCars = b.parkCars.filter(x=>x!==car); }
+      }
+    }
+  });
+}
+
+/* ---------------- CUSTOMERS ---------------- */
+let custId=1;
+function findFirstOfKind(kind){ return state.buildings.filter(b=>BUILDING_DEFS[b.type].kind===kind); }
+function findNearestOfKind(kind, fromPos){
+  const cands = findFirstOfKind(kind);
+  if(!cands.length) return null;
+  let best=null, bd=1e9;
+  cands.forEach(b=>{
+    const cx=b.x+b.w/2, cy=b.y+b.h/2;
+    const d = Math.hypot(cx-fromPos.x, cy-fromPos.y);
+    if(d<bd){ bd=d; best=b; }
+  });
+  return best;
+}
+function pickTarget(){
+  const shelves = state.buildings.filter(b=>BUILDING_DEFS[b.type].kind==='shelf' && b.stock>0);
+  const slips = state.buildings.filter(b=>BUILDING_DEFS[b.type].kind==='slip' && b.boat && !b.boatOut && driving!==b);
+  const pool = [];
+  shelves.forEach(s=>pool.push({type:'shelf',b:s}));
+  slips.forEach(s=>pool.push({type:'slip',b:s}));
+  if(!pool.length) return null;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function findFreeParking(){
+  const lots = state.buildings.filter(b=>BUILDING_DEFS[b.type].kind==='parking' && b.occupied<BUILDING_DEFS[b.type].cap*(1+(b.level-1)*0.5));
+  if(!lots.length) return null;
+  return lots[Math.floor(Math.random()*lots.length)];
+}
+function findAccessCell(b){
+  const cands=[];
+  for(let dx=-1;dx<=b.w;dx++) for(let dy=-1;dy<=b.h;dy++){
+    const cx=b.x+dx, cy=b.y+dy;
+    const inside = dx>=0&&dx<b.w&&dy>=0&&dy<b.h;
+    if(inside) continue;
+    if(walkable(cx,cy)) cands.push({x:cx,y:cy});
+  }
+  return cands.length? cands[Math.floor(Math.random()*cands.length)] : null;
+}
+/* ---------------- ROBLOX-STYLE BLOCKY PEOPLE ---------------- */
+const SKIN_TONES = [0xffdab3, 0xe8b487, 0xc68a5c, 0x8d5a34, 0xf0c8a0];
+const SHIRT_COLORS = [0xff6b5f, 0x5aa0f0, 0xffcf6b, 0x50c878, 0xd0a8ff, 0xff9aa8, 0xa8ffb0, 0x79c9ff, 0xffa552, 0x8fd3f4];
+const PANTS_COLORS = [0x3a3a4a, 0x555577, 0x6b4a2a, 0x2f4a68, 0x4a4a4a, 0x394a35];
+const HAIR_COLORS = [0x2a2016, 0x5a3a20, 0x8a6a3a, 0x1a1a1a, 0xb08050, 0x3a2a1a];
+function pickOne(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function makeBlockPerson(opts){
+  const shirt = opts.shirt, pants = opts.pants, skin = opts.skin, hair = opts.hair, vestColor = opts.vestColor;
+  const g = new THREE.Group();
+  const legH=0.68, torsoH=0.85, headS=0.5, limbW=0.28;
+
+  const legMat = new THREE.MeshStandardMaterial({color:pants});
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(limbW,legH,limbW), legMat);
+  legL.position.set(-0.16, legH/2, 0); legL.castShadow=true; g.add(legL);
+  const legR = legL.clone(); legR.position.x=0.16; g.add(legR);
+
+  const torsoMat = new THREE.MeshStandardMaterial({color:shirt});
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.62, torsoH, 0.34), torsoMat);
+  torso.position.y = legH+torsoH/2; torso.castShadow=true; g.add(torso);
+
+  const armMat = new THREE.MeshStandardMaterial({color:shirt});
+  const armGeo = new THREE.BoxGeometry(limbW, torsoH*0.9, limbW);
+  const armL = new THREE.Mesh(armGeo, armMat);
+  armL.position.set(-0.62/2-limbW/2+0.01, legH+torsoH*0.9/2+0.03, 0); armL.castShadow=true; g.add(armL);
+  const armR = armL.clone(); armR.position.x = 0.62/2+limbW/2-0.01; g.add(armR);
+  // hands (skin-toned tips)
+  const handMat = new THREE.MeshStandardMaterial({color:skin});
+  const handL = new THREE.Mesh(new THREE.BoxGeometry(limbW*0.95,0.16,limbW*0.95), handMat);
+  handL.position.set(armL.position.x, legH+0.08, 0); g.add(handL);
+  const handR = handL.clone(); handR.position.x = armR.position.x; g.add(handR);
+
+  const headMat = new THREE.MeshStandardMaterial({color:skin});
+  const head = new THREE.Mesh(new THREE.BoxGeometry(headS,headS,headS), headMat);
+  head.position.y = legH+torsoH+headS/2+0.04; head.castShadow=true; g.add(head);
+
+  if(hair){
+    const hairCap = new THREE.Mesh(new THREE.BoxGeometry(headS*1.02,headS*0.34,headS*1.02), new THREE.MeshStandardMaterial({color:hair}));
+    hairCap.position.y = head.position.y + headS*0.38; hairCap.castShadow=true; g.add(hairCap);
+  }
+
+  if(vestColor){
+    const vest = new THREE.Mesh(new THREE.BoxGeometry(0.7, torsoH*0.82, 0.42), new THREE.MeshStandardMaterial({color:vestColor}));
+    vest.position.y = legH+torsoH/2+0.03; vest.castShadow=true; g.add(vest);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.72,0.1,0.44), new THREE.MeshStandardMaterial({color:0xffe27a, emissive:0x554400, emissiveIntensity:0.35}));
+    stripe.position.y = legH+torsoH*0.62; g.add(stripe);
+  }
+  return g;
+}
+function makeCustomerMesh(){
+  return makeBlockPerson({
+    shirt: pickOne(SHIRT_COLORS), pants: pickOne(PANTS_COLORS),
+    skin: pickOne(SKIN_TONES), hair: Math.random()<0.85 ? pickOne(HAIR_COLORS) : null,
+  });
+}
+function makeStaffMesh(role){
+  const vestColor = role==='restock' ? 0xe0b04a : role==='cleaner' ? 0x50c878 : role==='cashier' ? 0xffb84d : 0x4a90c9;
+  return makeBlockPerson({
+    shirt: pickOne(SHIRT_COLORS), pants: pickOne(PANTS_COLORS),
+    skin: pickOne(SKIN_TONES), hair: pickOne(HAIR_COLORS), vestColor,
+  });
+}
+let staffId=1;
+function hireStaff(key){
+  const d = STAFF_DEFS[key];
+  state.money -= d.cost; state.expenseToday += d.cost;
+  const entrances = findFirstOfKind('entrance');
+  const spawn = entrances.length? entrances[0] : {x:state.ownedRect.x+1, y:state.ownedRect.y+1};
+  const s = {id:staffId++, role:d.role, wage:d.wage, pos:{x:spawn.x+0.5,y:spawn.y+0.5}, stage:'idle', path:[], pathIdx:0, timer:0, scanTimer:0, targetId:null, trashTarget:null};
+  s.mesh = makeStaffMesh(d.role);
+  scene.add(s.mesh);
+  state.staff.push(s);
+  toast(d.name+' hired!');
+}
+function advanceStaffPath(s,dt){
+  if(!s.path||!s.path.length) return true;
+  let remaining = 1.6*dt;
+  while(remaining>0){
+    if(s.pathIdx>=s.path.length) return true;
+    const t=s.path[s.pathIdx];
+    const tc={x:t.x+0.5,y:t.y+0.5};
+    const dx=tc.x-s.pos.x, dy=tc.y-s.pos.y, d=Math.hypot(dx,dy);
+    if(d<0.05){ s.pathIdx++; continue; }
+    const step=Math.min(remaining,d);
+    s.pos.x+=(dx/d)*step; s.pos.y+=(dy/d)*step;
+    s.heading=Math.atan2(dx,dy);
+    remaining-=step;
+    if(s.pathIdx>=s.path.length) return true;
+  }
+  return false;
+}
+function updateStaff(dt){
+  state.buildings.forEach(b=>{ if(BUILDING_DEFS[b.type].kind==='slip') b.dockhandBoost=false; });
+  for(const s of state.staff){
+    if(s.role==='dockhand'){
+      if(s.stage==='idle' && !s._postTried){
+        s._postTried = true;
+        const slips = state.buildings.filter(b=>BUILDING_DEFS[b.type].kind==='slip');
+        if(slips.length){
+          const target = slips[Math.floor(Math.random()*slips.length)];
+          const access = findAccessCell(target);
+          if(access){
+            const path = bfsPath([{x:Math.floor(s.pos.x),y:Math.floor(s.pos.y)}], (x,y)=>x===access.x&&y===access.y, walkable);
+            if(path){ s.path=path; s.pathIdx=0; s.stage='toPost'; }
+          }
+        }
+      }
+      if(s.stage==='toPost'){ if(advanceStaffPath(s,dt)) s.stage='atPost'; }
+      state.buildings.forEach(b=>{
+        if(BUILDING_DEFS[b.type].kind==='slip'){
+          if(Math.hypot(b.x-s.pos.x, b.y-s.pos.y) < 7) b.dockhandBoost = true;
+        }
+      });
+    } else if(s.role==='restock'){
+      s.scanTimer -= dt;
+      if(s.stage==='idle'){
+        if(s.scanTimer<=0){
+          s.scanTimer = 1.5;
+          const busy = new Set(state.staff.filter(o=>o!==s && o.targetId!=null).map(o=>o.targetId));
+          const shelves = state.buildings.filter(b=>BUILDING_DEFS[b.type].kind==='shelf' && b.stock < BUILDING_DEFS[b.type].maxStock*0.4 && !busy.has(b.id));
+          if(shelves.length){
+            let best=null,bd=1e9;
+            shelves.forEach(sh=>{ const d=Math.hypot(sh.x-s.pos.x, sh.y-s.pos.y); if(d<bd){bd=d;best=sh;} });
+            const access = findAccessCell(best);
+            if(access){
+              const path = bfsPath([{x:Math.floor(s.pos.x),y:Math.floor(s.pos.y)}], (x,y)=>x===access.x&&y===access.y, walkable);
+              if(path){ s.path=path; s.pathIdx=0; s.stage='toShelf'; s.targetId=best.id; }
+            }
+          }
+        }
+      } else if(s.stage==='toShelf'){
+        if(advanceStaffPath(s,dt)){ s.stage='restocking'; s.timer=1.4; }
+      } else if(s.stage==='restocking'){
+        s.timer -= dt;
+        if(s.timer<=0){
+          const shelf = state.buildings.find(b=>b.id===s.targetId);
+          const def = shelf?BUILDING_DEFS[shelf.type]:null;
+          if(shelf && def && state.money>=def.restockCost){
+            state.money -= def.restockCost; state.expenseToday += def.restockCost;
+            shelf.stock = def.maxStock; updateShelfVisual(shelf);
+            const c = cellToWorld(shelf.x+shelf.w/2, shelf.y+shelf.h/2);
+            spawnFxPopup(c.x,2.5,c.z,null,'Restocked!');
+          }
+          s.targetId=null; s.stage='idle'; s.scanTimer=0.5;
+        }
+      }
+    } else if(s.role==='cleaner'){
+      s.scanTimer -= dt;
+      if(s.stage==='idle'){
+        if(s.scanTimer<=0){
+          s.scanTimer = 1.0;
+          const busy = new Set(state.staff.filter(o=>o!==s && o.trashTarget!=null).map(o=>o.trashTarget));
+          const candidates = state.trash.filter(t=>!busy.has(t.id));
+          if(candidates.length){
+            let best=null,bd=1e9;
+            candidates.forEach(t=>{ const d=Math.hypot(t.x/CELL-s.pos.x, t.z/CELL-s.pos.y); if(d<bd){bd=d;best=t;} });
+            if(best){
+              const gx=Math.floor(best.x/CELL), gy=Math.floor(best.z/CELL);
+              const path = bfsPath([{x:Math.floor(s.pos.x),y:Math.floor(s.pos.y)}], (x,y)=>Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1, walkable);
+              if(path){ s.path=path; s.pathIdx=0; s.stage='toTrash'; s.trashTarget=best.id; }
+            }
+          }
+        }
+      } else if(s.stage==='toTrash'){
+        if(advanceStaffPath(s,dt)){ s.stage='cleaning'; s.timer=0.6; }
+      } else if(s.stage==='cleaning'){
+        s.timer -= dt;
+        if(s.timer<=0){
+          const t = state.trash.find(x=>x.id===s.trashTarget);
+          if(t) removeTrash(t);
+          s.trashTarget=null; s.stage='idle'; s.scanTimer=0.3;
+        }
+      }
+    } else if(s.role==='cashier'){
+      s.scanTimer -= dt;
+      if(s.stage==='idle'){
+        if(s.scanTimer<=0){
+          s.scanTimer = 1.0;
+          const busy = new Set(state.staff.filter(o=>o!==s && o.targetId!=null).map(o=>o.targetId));
+          const registers = state.buildings.filter(b=>BUILDING_DEFS[b.type].kind==='register' && b.pendingCash>0 && !busy.has(b.id));
+          if(registers.length){
+            let best=null,bd=1e9;
+            registers.forEach(r=>{ const d=Math.hypot(r.x-s.pos.x, r.y-s.pos.y); if(d<bd){bd=d;best=r;} });
+            const access = findAccessCell(best);
+            if(access){
+              const path = bfsPath([{x:Math.floor(s.pos.x),y:Math.floor(s.pos.y)}], (x,y)=>x===access.x&&y===access.y, walkable);
+              if(path){ s.path=path; s.pathIdx=0; s.stage='toRegister'; s.targetId=best.id; }
+            }
+          }
+        }
+      } else if(s.stage==='toRegister'){
+        if(advanceStaffPath(s,dt)){ s.stage='cashing'; s.timer=0.8; }
+      } else if(s.stage==='cashing'){
+        s.timer -= dt;
+        if(s.timer<=0){
+          const reg = state.buildings.find(b=>b.id===s.targetId);
+          if(reg) collectPendingCash(reg);
+          s.targetId=null; s.stage='idle'; s.scanTimer=0.4;
+        }
+      }
+    }
+    if(s.mesh){ s.mesh.position.set(s.pos.x*CELL,0,s.pos.y*CELL); if(s.heading!==undefined) s.mesh.rotation.y=s.heading; }
+  }
+}
+function trySpawnCustomer(){
+  const entrances = findFirstOfKind('entrance');
+  if(!entrances.length) return;
+  const parking = findFreeParking();
+  if(!parking) return; // no free car park space — customer can't visit
+  const target = pickTarget();
+  if(!target) return;
+  const entrance = entrances[Math.floor(Math.random()*entrances.length)];
+  const access = findAccessCell(target.b);
+  if(!access) return;
+  const path = bfsPath([{x:entrance.x,y:entrance.y}], (x,y)=>x===access.x&&y===access.y, walkable);
+  if(!path) return;
+  parking.occupied = (parking.occupied||0)+1;
+  const c = {id:custId++, pos:{x:entrance.x+0.5,y:entrance.y+0.5}, path, pathIdx:0, stage:'toTarget',
+    targetType:target.type, targetId:target.b.id, speed:1.3+Math.random()*0.4, timer:0, entrance, parkingId:parking.id};
+  c.mesh = makeCustomerMesh(); scene.add(c.mesh);
+  state.customers.push(c);
+  state.custToday++;
+}
+function releaseParking(c){
+  if(c.parkingId==null) return;
+  const lot = state.buildings.find(b=>b.id===c.parkingId);
+  if(lot) lot.occupied = Math.max(0,(lot.occupied||0)-1);
+}
+function advanceCustPath(c,dt){
+  if(!c.path || !c.path.length) return true;
+  let remaining=c.speed*dt;
+  while(remaining>0){
+    if(c.pathIdx>=c.path.length) return true;
+    const t=c.path[c.pathIdx];
+    const tc={x:t.x+0.5,y:t.y+0.5};
+    const dx=tc.x-c.pos.x, dy=tc.y-c.pos.y, d=Math.hypot(dx,dy);
+    if(d<0.05){ c.pathIdx++; continue; }
+    const step=Math.min(remaining,d);
+    c.pos.x+=(dx/d)*step; c.pos.y+=(dy/d)*step;
+    c.heading = Math.atan2(dx,dy);
+    remaining-=step;
+    if(c.pathIdx>=c.path.length) return true;
+  }
+  return false;
+}
+function updateCustomers(dt){
+  for(const c of [...state.customers]){
+    if(c.stage==='toTarget'){
+      if(advanceCustPath(c,dt)){ c.stage='interacting'; c.timer=1.2+Math.random()*1.2; }
+    } else if(c.stage==='interacting'){
+      c.timer -= dt;
+      if(c.timer<=0){
+        const b = state.buildings.find(bb=>bb.id===c.targetId);
+        let wentToRegister = false;
+        if(b){
+          const def = BUILDING_DEFS[b.type];
+          if(def.kind==='shelf' && b.stock>0){
+            b.stock--; updateShelfVisual(b);
+            c.cartTotal = def.price;
+            state.satisfactionSum += 1; state.satisfactionCount++;
+            const register = findNearestOfKind('register', c.pos);
+            if(register){
+              const racc = findAccessCell(register);
+              if(racc){
+                const path = bfsPath([{x:Math.floor(c.pos.x),y:Math.floor(c.pos.y)}], (x,y)=>x===racc.x&&y===racc.y, walkable);
+                if(path){ c.path=path; c.pathIdx=0; c.stage='toRegister'; c.registerId=register.id; wentToRegister=true; }
+              }
+            }
+            if(!wentToRegister){
+              const cellC = cellToWorld(b.x+b.w/2, b.y+b.h/2);
+              spawnFxPopup(cellC.x, 2, cellC.z, null, 'No register — lost sale!');
+            }
+          } else if(def.kind==='slip' && b.boat && !b.boatOut){
+            launchBoat(b);
+            state.satisfactionSum += 1; state.satisfactionCount++;
+          }
+        }
+        if(!wentToRegister){
+          const backPath = bfsPath([{x:Math.floor(c.pos.x),y:Math.floor(c.pos.y)}], (x,y)=>x===c.entrance.x&&y===c.entrance.y, walkable);
+          c.path = backPath || []; c.pathIdx=0; c.stage='leaving';
+          if(Math.random()<0.4) spawnTrash(Math.floor(c.pos.x), Math.floor(c.pos.y));
+        }
+      }
+    } else if(c.stage==='toRegister'){
+      if(advanceCustPath(c,dt)){
+        const reg = state.buildings.find(bb=>bb.id===c.registerId);
+        if(!reg){ c.stage='leaving'; c.path=[]; continue; }
+        reg.queueList = reg.queueList || [];
+        if(reg.queueList.length>=6){
+          // line's too long — give up on this purchase
+          const cellC = cellToWorld(reg.x+reg.w/2, reg.y+reg.h/2);
+          spawnFxPopup(cellC.x, 2, cellC.z, null, 'Line too long — lost sale!');
+          c.cartTotal = 0;
+          const backPath = bfsPath([{x:Math.floor(c.pos.x),y:Math.floor(c.pos.y)}], (x,y)=>x===c.entrance.x&&y===c.entrance.y, walkable);
+          c.path = backPath || []; c.pathIdx=0; c.stage='leaving';
+        } else {
+          reg.queueList.push(c);
+          c.queueRegId = reg.id;
+          c.stage='queueRegister';
+        }
+      }
+    } else if(c.stage==='queueRegister'){
+      const reg = state.buildings.find(bb=>bb.id===c.queueRegId);
+      if(!reg){ c.stage='leaving'; c.path=[]; continue; }
+      reg.queueList = reg.queueList || [];
+      const idx = reg.queueList.indexOf(c);
+      if(idx<0){ reg.queueList.push(c); }
+      // stand in line: each spot is one pace further back from the register, along the approach direction
+      const regCenter = {x:reg.x+reg.w/2, y:reg.y+reg.h/2};
+      const dirX = c.pos.x-regCenter.x, dirY = c.pos.y-regCenter.y;
+      const dirLen = Math.hypot(dirX,dirY)||1;
+      const anchorX = regCenter.x + (dirX/dirLen)*1.3;
+      const anchorY = regCenter.y + (dirY/dirLen)*1.3;
+      const slotX = anchorX + (dirX/dirLen)*(idx*0.85);
+      const slotY = anchorY + (dirY/dirLen)*(idx*0.85);
+      const ddx=slotX-c.pos.x, ddy=slotY-c.pos.y, dd=Math.hypot(ddx,ddy);
+      if(dd>0.08){
+        const step=Math.min(c.speed*dt, dd);
+        c.pos.x += (ddx/dd)*step; c.pos.y += (ddy/dd)*step;
+        c.heading = Math.atan2(ddx,ddy);
+      }
+      if(idx===0){
+        reg.serveTimer = reg.serveTimer===undefined ? 1.0 : reg.serveTimer-dt;
+        if(reg.serveTimer<=0){
+          if(c.cartTotal){
+            const cellC = cellToWorld(reg.x+reg.w/2, reg.y+reg.h/2);
+            addPendingCash(reg, c.cartTotal*(1+(reg.level-1)*0.2), cellC.x, cellC.z);
+          }
+          c.cartTotal = 0;
+          reg.queueList.shift();
+          reg.serveTimer = 1.1/(1+(reg.level-1)*0.35);
+          const backPath = bfsPath([{x:Math.floor(c.pos.x),y:Math.floor(c.pos.y)}], (x,y)=>x===c.entrance.x&&y===c.entrance.y, walkable);
+          c.path = backPath || []; c.pathIdx=0; c.stage='leaving';
+          if(Math.random()<0.4) spawnTrash(Math.floor(c.pos.x), Math.floor(c.pos.y));
+        }
+      }
+    } else if(c.stage==='leaving'){
+      if(advanceCustPath(c,dt) || !c.path.length){
+        if(c.queueRegId!=null){ const reg=state.buildings.find(bb=>bb.id===c.queueRegId); if(reg && reg.queueList) reg.queueList=reg.queueList.filter(x=>x!==c); }
+        scene.remove(c.mesh); releaseParking(c); state.customers=state.customers.filter(x=>x!==c); continue;
+      }
+    }
+    if(c.mesh){ c.mesh.position.set(c.pos.x*CELL,0,c.pos.y*CELL); if(c.heading!==undefined) c.mesh.rotation.y=c.heading; }
+  }
+}
+
+/* ---------------- ECONOMY / RATING / DAY CYCLE ---------------- */
+function tickEconomy(dtMinutes){
+  let exp=0;
+  state.buildings.forEach(b=>{ exp += (BUILDING_DEFS[b.type].cost*0.00001)*dtMinutes; });
+  state.money -= exp; state.expenseToday += exp;
+}
+function computeRating(){
+  const shelves = state.buildings.filter(b=>BUILDING_DEFS[b.type].kind==='shelf');
+  const stockRatio = shelves.length? shelves.reduce((a,b)=>a+b.stock/BUILDING_DEFS[b.type].maxStock,0)/shelves.length : 0.5;
+  const decorCount = state.buildings.filter(b=>BUILDING_DEFS[b.type].kind==='decor').length;
+  const decorScore = Math.min(1, decorCount*0.08);
+  const satScore = state.satisfactionCount>0 ? Math.min(1,state.satisfactionSum/Math.max(state.satisfactionCount,1)) : 0.6;
+  const activityScore = Math.min(1, state.lastDayBoats/10 + state.lastDayCust/25);
+  const litterPenalty = Math.min(0.35, state.trash.length*0.02);
+  const score = Math.max(0, stockRatio*0.3 + decorScore*0.15 + satScore*0.25 + activityScore*0.3 - litterPenalty);
+  state.rating = Math.max(1, Math.min(5, 1+score*4));
+}
+function endDay(){
+  const wages = state.staff.reduce((a,s)=>a+s.wage,0);
+  state.money -= wages; state.expenseToday += wages;
+  const profit = state.revenueToday - state.expenseToday;
+  state.day++;
+  state.lastDayRevenue=state.revenueToday; state.lastDayExpense=state.expenseToday;
+  state.lastDayCust=state.custToday; state.lastDayBoats=state.boatsToday;
+  state.revenueToday=0; state.expenseToday=0; state.custToday=0; state.boatsToday=0;
+  const prevRating = Math.floor(state.rating);
+  computeRating();
+  const profitStr = (profit>=0?'+$':'-$')+Math.abs(Math.floor(profit)).toLocaleString();
+  logFlightEvent(`Day ${state.day-1} complete — ${profitStr} profit · ${state.lastDayCust} customers · ${state.lastDayBoats} boats rented`);
+  if(Math.floor(state.rating) > prevRating) toast(`⭐ Your rating rose to ${Math.floor(state.rating)} stars!`);
+}
+let milestonesSeen = {firstBoat:false, money100k:false, money500k:false};
+function checkMilestones(){
+  if(!milestonesSeen.firstBoat && state.lastDayBoats+state.boatsToday>0){ milestonesSeen.firstBoat=true; toast('🚤 First boat rented!'); }
+  if(!milestonesSeen.money100k && state.money>=100000){ milestonesSeen.money100k=true; toast('💰 Milestone: $100,000!'); }
+  if(!milestonesSeen.money500k && state.money>=500000){ milestonesSeen.money500k=true; toast('💰 Milestone: $500,000! Time to expand.'); }
+}
+
+/* ---------------- TICKER / TOAST ---------------- */
+const tickerEl = document.getElementById('ticker');
+let tickerHideTimer=null;
+function logFlightEvent(msg){
+  tickerEl.innerHTML = '<b>🚤 Now:</b> '+msg;
+  tickerEl.style.display='block';
+  clearTimeout(tickerHideTimer);
+  tickerHideTimer = setTimeout(()=>{ tickerEl.style.display='none'; }, 6000);
+}
+let toastTimer=null;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.style.display='block';
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.style.display='none', 2600);
+}
+
+/* =========================================================================
+   FIRST-PERSON CONTROLS
+   ========================================================================= */
+const keys = {};
+let yaw = Math.PI*0.15, pitch = -0.1;
+let pointerLocked = false;
+const moveSpeed = 13, runMultiplier = 2.0;
+const PLAYER_RADIUS = 1.0;
+let jumpVel = 0, jumpOffset = 0;
+const GRAVITY = 28, JUMP_SPEED = 9;
+let driving = null, boatYaw = 0, boatVel = 0, boatBank = 0;
+const BOAT_MAX_SPEED = 12, BOAT_REVERSE_SPEED = 4.5, BOAT_ACCEL = 7, BOAT_DRAG = 3.2, BOAT_TURN_BASE = 1.5;
+
+function updateCameraRotation(){
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
+}
+updateCameraRotation();
+
+document.addEventListener('mousemove', e=>{
+  if(!pointerLocked) return;
+  if(driving) return; // third-person chase camera controls the view while driving
+  yaw -= e.movementX * 0.0022;
+  pitch -= e.movementY * 0.0022;
+  pitch = Math.max(-1.3, Math.min(1.3, pitch));
+  updateCameraRotation();
+});
+window.addEventListener('keydown', e=>{
+  keys[e.code]=true;
+  if(e.code==='Tab'){ e.preventDefault(); toggleBuildMenu(); }
+  if(e.code==='KeyR' && buildMode){ buildRot=(buildRot+90)%180; setPreview(buildMode); }
+  if(e.code==='Escape'){
+    if(buildMode || bulldozeMode || assignBoatMode){ stopBuilding(); }
+    else if(document.pointerLockElement){ document.exitPointerLock(); }
+  }
+  if(e.code==='Space' && pointerLocked && jumpOffset<=0.001){ jumpVel = JUMP_SPEED; }
+  if(e.code==='KeyE' && pointerLocked && !buildMode && !bulldozeMode){ tryInteract(); }
+  if(e.code==='KeyF' && pointerLocked && !buildMode && !bulldozeMode && !assignBoatMode){ toggleDriveBoat(); }
+  if(/^Digit[0-9]$/.test(e.code)){
+    devCodeBuffer = (devCodeBuffer + e.code.slice(-1)).slice(-10);
+    if(devCodeBuffer.endsWith('67') && !state.devUnlocked){
+      state.devUnlocked = true;
+      document.getElementById('btnDev').style.display='inline-block';
+      toast('🔓 Dev mode unlocked!');
+    }
+  }
+});
+window.addEventListener('keyup', e=>{ keys[e.code]=false; });
+let devCodeBuffer = '';
+document.getElementById('btnDev').onclick = ()=>{
+  state.money = 999999999;
+  toast('💰 Unlimited money granted.');
+};
+
+function solidBoundsList(){
+  return state.buildings.filter(b=>BUILDING_DEFS[b.type].solid).map(b=>({minX:b.x*CELL, maxX:(b.x+b.w)*CELL, minZ:b.y*CELL, maxZ:(b.y+b.h)*CELL}));
+}
+function collides(x,z,boxes){
+  for(const bx of boxes){
+    if(x>bx.minX-PLAYER_RADIUS && x<bx.maxX+PLAYER_RADIUS && z>bx.minZ-PLAYER_RADIUS && z<bx.maxZ+PLAYER_RADIUS) return true;
+  }
+  return false;
+}
+function updatePlayerMovement(dt){
+  if(!pointerLocked || driving) return;
+  let fwd=0, strafe=0;
+  if(keys['KeyW']) fwd+=1;
+  if(keys['KeyS']) fwd-=1;
+  if(keys['KeyD']) strafe+=1;
+  if(keys['KeyA']) strafe-=1;
+  if(fwd===0 && strafe===0) return;
+  const len = Math.hypot(fwd,strafe) || 1;
+  fwd/=len; strafe/=len;
+  const speed = moveSpeed * (keys['ShiftLeft']||keys['ShiftRight']?runMultiplier:1);
+  const dirX = -Math.sin(yaw)*fwd + Math.cos(yaw)*strafe;
+  const dirZ = -Math.cos(yaw)*fwd - Math.sin(yaw)*strafe;
+  const boxes = solidBoundsList();
+  const nx = camera.position.x + dirX*speed*dt;
+  const nz = camera.position.z + dirZ*speed*dt;
+  const maxX = GRID_W*CELL-1, maxZ = GRID_H*CELL-1;
+  const canWalkX = (cx,cz)=> !isWaterCell(Math.floor(cx/CELL),Math.floor(cz/CELL)) || ['pier','slip'].includes(kindAt(Math.floor(cx/CELL),Math.floor(cz/CELL)));
+  if(!collides(nx, camera.position.z, boxes) && canWalkX(nx, camera.position.z)) camera.position.x = Math.max(1,Math.min(maxX,nx));
+  if(!collides(camera.position.x, nz, boxes) && canWalkX(camera.position.x, nz)) camera.position.z = Math.max(1,Math.min(maxZ,nz));
+}
+function updateJump(dt){
+  if(driving) return;
+  if(jumpOffset>0 || jumpVel>0){
+    jumpVel -= GRAVITY*dt;
+    jumpOffset += jumpVel*dt;
+    if(jumpOffset<=0){ jumpOffset=0; jumpVel=0; }
+  }
+  const bob = pointerLocked && (keys['KeyW']||keys['KeyA']||keys['KeyS']||keys['KeyD']) && jumpOffset<=0
+    ? Math.sin(performance.now()*0.008)*0.06*((keys['ShiftLeft']||keys['ShiftRight'])?1.6:1) : 0;
+  camera.position.y = EYE_HEIGHT + jumpOffset + bob;
+}
+
+/* ---------------- DRIVE A BOAT ---------------- */
+function nearestDrivableSlip(){
+  let best=null, bd=7;
+  state.buildings.forEach(b=>{
+    if(BUILDING_DEFS[b.type].kind!=='slip' || !b.boat || b.boatOut || !b.dockedBoatMesh) return;
+    const p = b.dockedBoatMesh.position;
+    const d = Math.hypot(p.x-camera.position.x, p.z-camera.position.z);
+    if(d<bd){ bd=d; best=b; }
+  });
+  return best;
+}
+function toggleDriveBoat(){
+  if(driving){
+    const dock = slipDockPos(driving);
+    driving.dockedBoatMesh.position.set(dock.x, 0.3, dock.z);
+    driving.dockedBoatMesh.rotation.set(0, DOCK_PARK_YAW, 0);
+    const c = cellToWorld(driving.x+driving.w/2, driving.y+driving.h/2);
+    camera.position.set(dock.x, EYE_HEIGHT, dock.z - Math.sign(dock.z-c.z||1)*1.5);
+    yaw = boatYaw; pitch = -0.15;
+    camera.rotation.order = 'YXZ';
+    updateCameraRotation();
+    toast('Stepped off the boat.');
+    driving = null; boatVel = 0; boatBank = 0;
+  } else {
+    const slip = nearestDrivableSlip();
+    if(!slip){ toast('No docked boat nearby — walk up to one and press F.'); return; }
+    driving = slip;
+    boatVel = 0; boatBank = 0;
+    boatYaw = slip.dockedBoatMesh.rotation.y || 0;
+    // snap the chase camera into place immediately so it doesn't glide in from wherever the player was standing
+    const mesh = slip.dockedBoatMesh;
+    const camDist=9, camHeight=4.2;
+    camera.position.set(mesh.position.x - Math.sin(boatYaw)*camDist, mesh.position.y+camHeight, mesh.position.z - Math.cos(boatYaw)*camDist);
+    camera.lookAt(mesh.position.x, mesh.position.y+1.2, mesh.position.z);
+    toast('Driving the '+BOAT_DEFS[slip.boat.type].name+'. W/S throttle, A/D steer, Shift boost, F to get off.');
+  }
+}
+function boatCanBeAt(px,pz){
+  const gx=Math.floor(px/CELL), gy=Math.floor(pz/CELL);
+  if(!inBounds(gx,gy)) return false;
+  if(!isWaterCell(gx,gy)) return false;
+  const t = tiles[gy][gx];
+  if(t && (t.kind==='pier' || t.kind==='slip')) return false; // never drive through the wooden dock structures
+  return true;
+}
+function updateBoatDriving(dt){
+  if(!driving) return;
+  const mesh = driving.dockedBoatMesh;
+  if(!mesh){ driving=null; return; }
+  let fwd=0, turn=0;
+  if(keys['KeyW']) fwd+=1;
+  if(keys['KeyS']) fwd-=1;
+  if(keys['KeyA']) turn+=1;
+  if(keys['KeyD']) turn-=1;
+  const boosting = keys['ShiftLeft']||keys['ShiftRight'];
+  const maxFwd = BOAT_MAX_SPEED*(boosting?1.35:1);
+
+  // --- throttle physics: accelerate toward target, drag back to rest when idle ---
+  if(fwd>0) boatVel = Math.min(maxFwd, boatVel + BOAT_ACCEL*dt);
+  else if(fwd<0) boatVel = Math.max(-BOAT_REVERSE_SPEED, boatVel - BOAT_ACCEL*0.7*dt);
+  else {
+    if(boatVel>0) boatVel = Math.max(0, boatVel - BOAT_DRAG*dt);
+    else if(boatVel<0) boatVel = Math.min(0, boatVel + BOAT_DRAG*dt);
+  }
+
+  // --- steering: sluggish at rest, sharper at speed, like a real hull ---
+  const speedFrac = Math.min(1, Math.abs(boatVel)/BOAT_MAX_SPEED);
+  const turnRate = BOAT_TURN_BASE*(0.3+0.7*speedFrac);
+  boatYaw += turn*turnRate*dt;
+
+  // --- move, but never drive through a pier/slip deck or onto land ---
+  const dx = Math.sin(boatYaw)*boatVel*dt;
+  const dz = Math.cos(boatYaw)*boatVel*dt;
+  const margin = 1.2;
+  const minZ=(riverRowStart()+margin)*CELL, maxZ=(riverRowEnd()-margin)*CELL;
+  const minX=1.2*CELL, maxX=(GRID_W-1.2)*CELL;
+  let nx = mesh.position.x+dx, nz = mesh.position.z+dz;
+  nx = Math.max(minX, Math.min(maxX, nx));
+  nz = Math.max(minZ, Math.min(maxZ, nz));
+  if(!boatCanBeAt(nx, mesh.position.z)){ nx = mesh.position.x; boatVel *= 0.5; }
+  if(!boatCanBeAt(mesh.position.x, nz)){ nz = mesh.position.z; boatVel *= 0.5; }
+
+  const bobAmt = 0.05+0.06*speedFrac;
+  mesh.position.set(nx, 0.3+Math.sin(elapsedTotal*3)*bobAmt, nz);
+  mesh.rotation.y = boatYaw;
+  // banking into turns, smoothed rather than snapped
+  const targetBank = -turn*0.22*speedFrac;
+  boatBank += (targetBank-boatBank)*Math.min(1, dt*5);
+  mesh.rotation.z = boatBank;
+  mesh.rotation.x = Math.min(0.06, boatVel*0.006); // slight bow-down/up pitch with speed
+
+  // --- third-person chase camera, smoothly following behind the boat ---
+  const camDist = 9, camHeight = 4.2;
+  const desiredX = mesh.position.x - Math.sin(boatYaw)*camDist;
+  const desiredZ = mesh.position.z - Math.cos(boatYaw)*camDist;
+  const desiredY = mesh.position.y + camHeight;
+  const followLerp = 1-Math.pow(0.001, dt); // frame-rate independent smoothing
+  camera.position.x += (desiredX-camera.position.x)*followLerp;
+  camera.position.y += (desiredY-camera.position.y)*followLerp;
+  camera.position.z += (desiredZ-camera.position.z)*followLerp;
+  camera.lookAt(mesh.position.x + Math.sin(boatYaw)*4, mesh.position.y+1.3, mesh.position.z + Math.cos(boatYaw)*4);
+}
+
+/* ---------------- RAYCAST / CROSSHAIR ---------------- */
+const raycaster = new THREE.Raycaster();
+const groundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+function getCrosshairCell(){
+  raycaster.setFromCamera({x:0,y:0}, camera);
+  const hit = new THREE.Vector3();
+  const res = raycaster.ray.intersectPlane(groundPlane, hit);
+  if(!res) return null;
+  if(raycaster.ray.direction.y>=0 && hit.distanceTo(camera.position)>200) return null;
+  const gx = Math.floor(hit.x/CELL), gy = Math.floor(hit.z/CELL);
+  if(!inBounds(gx,gy)) return null;
+  return {x:gx,y:gy};
+}
+function buildingAtCell(x,y){
+  const t = tiles[y]?.[x]; if(!t) return null;
+  return state.buildings.find(b=>b.id===t.id);
+}
+
+/* ---------------- WALK-OVER CASH COLLECTION & INTERACT PROMPT ---------------- */
+function nearestInteractableShelf(){
+  let best=null, bd=1e9;
+  state.buildings.forEach(b=>{
+    const def = BUILDING_DEFS[b.type];
+    if(def.kind!=='shelf' || b.stock>=def.maxStock) return;
+    const c = cellToWorld(b.x+b.w/2, b.y+b.h/2);
+    const d = Math.hypot(c.x-camera.position.x, c.z-camera.position.z);
+    if(d<6 && d<bd){ bd=d; best=b; }
+  });
+  return best;
+}
+function updateInteractPrompt(){
+  const prompt = document.getElementById('interactPrompt');
+  if(buildMode || bulldozeMode || !pointerLocked){ prompt.style.display='none'; return; }
+  if(driving){ prompt.style.display='block'; prompt.innerHTML = '<b>F</b> — Step off the boat'; return; }
+  const drivableSlip = nearestDrivableSlip();
+  if(drivableSlip){ prompt.style.display='block'; prompt.innerHTML = '<b>F</b> — Drive the '+BOAT_DEFS[drivableSlip.boat.type].name; return; }
+  const b = nearestInteractableShelf();
+  if(b){
+    const def = BUILDING_DEFS[b.type];
+    prompt.style.display='block';
+    prompt.innerHTML = `<b>E</b> — Restock ${def.name} (${b.stock}/${def.maxStock}) — $${def.restockCost.toLocaleString()}`;
+  } else {
+    prompt.style.display='none';
+  }
+}
+function tryInteract(){
+  const b = nearestInteractableShelf();
+  if(!b) return;
+  const def = BUILDING_DEFS[b.type];
+  if(state.money<def.restockCost){ toast('Not enough money to restock!'); return; }
+  state.money -= def.restockCost; state.expenseToday += def.restockCost;
+  b.stock = def.maxStock;
+  updateShelfVisual(b);
+  const c = cellToWorld(b.x+b.w/2,b.y+b.h/2);
+  spawnFxPopup(c.x,2.5,c.z,null,'Restocked!');
+  toast(def.name+' restocked.');
+}
+function updateCashCollection(){
+  state.buildings.forEach(b=>{
+    if(!b.pendingCash || !pointerLocked) return;
+    const minX=b.x*CELL, maxX=(b.x+b.w)*CELL, minZ=b.y*CELL, maxZ=(b.y+b.h)*CELL;
+    const dx = Math.max(minX-camera.position.x, 0, camera.position.x-maxX);
+    const dz = Math.max(minZ-camera.position.z, 0, camera.position.z-maxZ);
+    const d = Math.hypot(dx,dz);
+    if(d < 3) collectPendingCash(b);
+  });
+}
+
+/* ---------------- POINTER LOCK / CLICK ACTIONS ---------------- */
+canvasEl.addEventListener('click', ()=>{
+  if(!pointerLocked && document.getElementById('buildMenu').style.display!=='block' && document.getElementById('infoPanel').style.display!=='block'){
+    canvasEl.requestPointerLock();
+  }
+});
+document.addEventListener('pointerlockchange', ()=>{ pointerLocked = document.pointerLockElement===canvasEl; });
+canvasEl.addEventListener('mousedown', e=>{
+  if(!pointerLocked) return;
+  if(e.button===0){
+    if(!hoverCell) return;
+    if(assignBoatMode){
+      const b = buildingAtCell(hoverCell.x,hoverCell.y);
+      if(!b || BUILDING_DEFS[b.type].kind!=='slip'){ toast('Click on a boat slip to assign this boat.'); return; }
+      if(b.boat){ toast('That slip already has a boat.'); return; }
+      const boatDef = BOAT_DEFS[assignBoatMode];
+      if(BUILDING_DEFS[b.type].rank < boatDef.rank){ toast(`This slip is too small for a ${boatDef.name}.`); return; }
+      if(state.money<boatDef.cost){ toast('Not enough money!'); return; }
+      state.money -= boatDef.cost; state.expenseToday += boatDef.cost;
+      b.boat = {type:assignBoatMode, price:boatDef.price, rentMin:boatDef.rentMin, rentMax:boatDef.rentMax};
+      dockBoatVisual(b);
+      toast(boatDef.name+' assigned to Slip #'+b.id+'!');
+      const assignedKey = assignBoatMode;
+      assignBoatMode=null; updateBuildHUD();
+      advanceTutorial(assignedKey);
+      return;
+    }
+    if(buildMode){
+      if(placeBuilding(buildMode, hoverCell.x, hoverCell.y, buildRot)) toast(BUILDING_DEFS[buildMode].name+' built.');
+    } else if(bulldozeMode){
+      const b = buildingAtCell(hoverCell.x,hoverCell.y);
+      if(b){ const refund=Math.floor(BUILDING_DEFS[b.type].cost*0.4); state.money+=refund; removeBuilding(b); toast('Removed. +$'+refund.toLocaleString()); }
+    } else {
+      const b = buildingAtCell(hoverCell.x,hoverCell.y);
+      if(b) selectBuildingUI(b);
+    }
+  } else if(e.button===2){
+    if(buildMode){ buildRot=(buildRot+90)%180; setPreview(buildMode); }
+  }
+});
+canvasEl.addEventListener('contextmenu', e=>e.preventDefault());
+
+document.getElementById('tutorialYesBtn').onclick = ()=>{
+  state.tutorial.active = true; state.tutorial.step = 0;
+  document.getElementById('startOverlay').style.display='none';
+  updateTutorialBanner();
+  activeCat = TUTORIAL_STEPS[0].cat;
+  refreshCatButtons();
+  openBuildMenu();
+};
+document.getElementById('tutorialNoBtn').onclick = ()=>{
+  document.getElementById('startOverlay').style.display='none';
+  canvasEl.requestPointerLock();
+};
+function updateTutorialBanner(){
+  const el = document.getElementById('tutorialBanner');
+  const step = state.tutorial.active ? TUTORIAL_STEPS[state.tutorial.step] : null;
+  if(!step){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML = `Tutorial ${state.tutorial.step+1}/${TUTORIAL_STEPS.length}: ${step.label} <button id="skipTutorialBtn">Skip Tutorial</button>`;
+  document.getElementById('skipTutorialBtn').onclick = ()=>{
+    state.tutorial.active=false;
+    updateTutorialBanner();
+    renderItemList();
+    toast('Tutorial skipped — full menu unlocked.');
+  };
+}
+function advanceTutorial(completedKey){
+  if(!state.tutorial.active) return;
+  const step = TUTORIAL_STEPS[state.tutorial.step];
+  if(!step || step.key!==completedKey) return;
+  state.tutorial.step++;
+  stopBuilding();
+  if(state.tutorial.step>=TUTORIAL_STEPS.length){
+    state.tutorial.active=false;
+    toast('🎉 Tutorial complete! Full build menu unlocked.');
+  } else {
+    const next = TUTORIAL_STEPS[state.tutorial.step];
+    toast('Nice! Next: '+next.label);
+    activeCat = next.cat;
+    refreshCatButtons();
+    openBuildMenu();
+  }
+  updateTutorialBanner();
+  renderItemList();
+}
+
+/* =========================================================================
+   BUILD MENU UI
+   ========================================================================= */
+const buildMenuEl = document.getElementById('buildMenu');
+const catRow = document.getElementById('catRow');
+const itemList = document.getElementById('itemList');
+let activeCat = 'docks';
+CATS.forEach(c=>{
+  const btn = document.createElement('div');
+  btn.className='cat-btn'+(c.key===activeCat?' active':'');
+  btn.textContent = c.name;
+  btn.onclick = ()=>{ activeCat=c.key; refreshCatButtons(); renderItemList(); };
+  catRow.appendChild(btn);
+});
+function refreshCatButtons(){ [...catRow.children].forEach((el,i)=>el.classList.toggle('active', CATS[i].key===activeCat)); }
+function renderItemList(){
+  itemList.innerHTML='';
+  if(state.tutorial.active){
+    const step = TUTORIAL_STEPS[state.tutorial.step];
+    if(!step){ return; }
+    if(activeCat!==step.cat){
+      itemList.innerHTML = `<div style="color:var(--txt-dim);font-size:12px;padding:10px;">Finish the current tutorial step first:<br><b style="color:var(--gold)">${step.label}</b></div>`;
+      return;
+    }
+    if(step.cat==='boats'){
+      const k = step.key, d = BOAT_DEFS[k];
+      const card=document.createElement('div');
+      card.className='item-card'+(assignBoatMode===k?' selected':'');
+      card.innerHTML = `<div class="nm">${d.name}<span>Rank ${d.rank}</span></div>
+        <div class="desc">${d.desc}</div>
+        <div class="cost ${d.cost>state.money?'no':''}">$${d.cost.toLocaleString()} · fee $${d.price}/rental</div>`;
+      card.onclick = ()=>{
+        buildMode=null; bulldozeMode=false;
+        document.getElementById('bulldozeItem').classList.remove('active');
+        setPreview(null);
+        assignBoatMode=k;
+        renderItemList(); updateBuildHUD(); closeBuildMenu();
+      };
+      itemList.appendChild(card);
+      return;
+    }
+    const k = step.key, d = BUILDING_DEFS[k];
+    const card=document.createElement('div');
+    card.className='item-card'+(buildMode===k?' selected':'');
+    card.innerHTML = `<div class="nm">${d.name}<span>${d.w}×${d.h}</span></div>
+      <div class="desc">${d.desc}</div>
+      <div class="cost ${d.cost>state.money?'no':''}">$${d.cost.toLocaleString()}</div>`;
+    card.onclick = ()=>{
+      buildMode=k; bulldozeMode=false; buildRot=0; assignBoatMode=null;
+      document.getElementById('bulldozeItem').classList.remove('active');
+      setPreview(buildMode);
+      renderItemList(); updateBuildHUD(); closeBuildMenu();
+    };
+    itemList.appendChild(card);
+    return;
+  }
+  if(activeCat==='boats'){
+    Object.entries(BOAT_DEFS).forEach(([k,d])=>{
+      const card=document.createElement('div');
+      card.className='item-card'+(assignBoatMode===k?' selected':'');
+      card.innerHTML = `<div class="nm">${d.name}<span>Rank ${d.rank}</span></div>
+        <div class="desc">${d.desc}</div>
+        <div class="cost ${d.cost>state.money?'no':''}">$${d.cost.toLocaleString()} · fee $${d.price}/rental</div>`;
+      card.onclick = ()=>{
+        buildMode=null; bulldozeMode=false;
+        document.getElementById('bulldozeItem').classList.remove('active');
+        setPreview(null);
+        assignBoatMode=k;
+        renderItemList();
+        updateBuildHUD();
+        closeBuildMenu();
+      };
+      itemList.appendChild(card);
+    });
+    return;
+  }
+  if(activeCat==='staff'){
+    Object.entries(STAFF_DEFS).forEach(([k,d])=>{
+      const count = state.staff.filter(s=>s.role===d.role).length;
+      const total = state.staff.length;
+      const card=document.createElement('div');
+      card.className='item-card';
+      const disabled = total>=MAX_STAFF || state.money<d.cost;
+      card.style.opacity = disabled? 0.55 : 1;
+      card.innerHTML = `<div class="nm">${d.name}<span>${count} hired</span></div>
+        <div class="desc">${d.desc}</div>
+        <div class="cost ${state.money<d.cost?'no':''}">$${d.cost.toLocaleString()} + $${d.wage}/day wage</div>`;
+      card.onclick = ()=>{
+        if(total>=MAX_STAFF){ toast(`Max ${MAX_STAFF} staff reached.`); return; }
+        if(state.money<d.cost){ toast('Not enough money to hire.'); return; }
+        hireStaff(k);
+        renderItemList();
+      };
+      itemList.appendChild(card);
+    });
+    return;
+  }
+  Object.entries(BUILDING_DEFS).filter(([k,d])=>d.cat===activeCat).forEach(([k,d])=>{
+    const card=document.createElement('div');
+    card.className='item-card'+(buildMode===k?' selected':'');
+    card.innerHTML = `<div class="nm">${d.name}<span>${d.w}×${d.h}</span></div>
+      <div class="desc">${d.desc}</div>
+      <div class="cost ${d.cost>state.money?'no':''}">$${d.cost.toLocaleString()}</div>`;
+    card.onclick = ()=>{
+      buildMode=k; bulldozeMode=false; buildRot=0; assignBoatMode=null;
+      document.getElementById('bulldozeItem').classList.remove('active');
+      setPreview(buildMode);
+      renderItemList();
+      updateBuildHUD();
+      closeBuildMenu();
+    };
+    itemList.appendChild(card);
+  });
+}
+document.getElementById('bulldozeItem').onclick = ()=>{
+  bulldozeMode = !bulldozeMode;
+  buildMode=null; setPreview(null);
+  document.getElementById('bulldozeItem').classList.toggle('active', bulldozeMode);
+  updateBuildHUD();
+  if(bulldozeMode) closeBuildMenu();
+};
+document.getElementById('closeMenuBtn').onclick = closeBuildMenu;
+document.getElementById('walkAroundBtn').onclick = ()=>{ stopBuilding(); closeBuildMenu(); };
+function openCat(c){ activeCat=c; refreshCatButtons(); openBuildMenu(); }
+document.getElementById('btnBoats').onclick = ()=>openCat('boats');
+document.getElementById('btnStaff').onclick = ()=>openCat('staff');
+document.getElementById('menuToggle').onclick = toggleBuildMenu;
+function toggleBuildMenu(){ (buildMenuEl.style.display==='block') ? closeBuildMenu() : openBuildMenu(); }
+function openBuildMenu(){ buildMenuEl.style.display='block'; renderItemList(); if(document.pointerLockElement) document.exitPointerLock(); }
+function closeBuildMenu(){ buildMenuEl.style.display='none'; }
+function updateBuildHUD(){
+  const hud = document.getElementById('buildHUD');
+  const stopBtn = document.getElementById('stopBuildBtn');
+  if(buildMode){
+    const d = BUILDING_DEFS[buildMode];
+    hud.style.display='block';
+    hud.innerHTML = `<b>Placing:</b> ${d.name} — $${d.cost.toLocaleString()}<br>Left-click to place · Right-click to rotate`;
+    stopBtn.style.display='block';
+  } else if(bulldozeMode){
+    hud.style.display='block';
+    hud.innerHTML = `<b>Bulldoze Mode</b><br>Left-click any building to remove it (40% refund)`;
+    stopBtn.style.display='block';
+  } else if(assignBoatMode){
+    const d = BOAT_DEFS[assignBoatMode];
+    hud.style.display='block';
+    hud.innerHTML = `<b>Assigning:</b> ${d.name} — $${d.cost.toLocaleString()}<br>Left-click a compatible empty slip (green) to assign it`;
+    stopBtn.style.display='block';
+  } else {
+    hud.style.display='none'; stopBtn.style.display='none';
+  }
+}
+function stopBuilding(){
+  buildMode=null; bulldozeMode=false; assignBoatMode=null;
+  setPreview(null);
+  document.getElementById('bulldozeItem').classList.remove('active');
+  updateBuildHUD();
+  if(!document.pointerLockElement) canvasEl.requestPointerLock();
+}
+document.getElementById('stopBuildBtn').onclick = stopBuilding;
+
+/* ---------------- INFO PANEL ---------------- */
+const infoPanel = document.getElementById('infoPanel');
+const infoContent = document.getElementById('infoContent');
+document.getElementById('closeInfo').onclick = closeInfoPanel;
+function closeInfoPanel(){ infoPanel.style.display='none'; selectedBuilding=null; }
+function selectBuildingUI(b){
+  selectedBuilding=b;
+  const def = BUILDING_DEFS[b.type];
+  infoPanel.style.display='block';
+  if(document.pointerLockElement) document.exitPointerLock();
+  const upgradeCost = Math.floor(def.cost*0.7*b.level);
+  const canUpgrade = b.level<def.maxLevel;
+  let statusLine='';
+  if(def.kind==='shelf') statusLine += `<div class="row"><span>Stock</span><span>${b.stock}/${def.maxStock}</span></div><div class="row"><span>Price/item</span><span>$${def.price}</span></div>`;
+  if(def.kind==='slip'){
+    if(b.boat){
+      statusLine += `<div class="row"><span>Boat</span><span>${BOAT_DEFS[b.boat.type].name}</span></div>
+        <div class="row"><span>Status</span><span>${b.boatOut?'Out renting':'Docked'}</span></div>
+        <div class="row"><span>Rental fee</span><span>$${b.boat.price}</span></div>`;
+    } else {
+      statusLine += `<div class="row"><span>Boat</span><span>None assigned — buy one from the Boats menu</span></div>`;
+    }
+  }
+  if(def.kind==='parking') statusLine += `<div class="row"><span>Occupied</span><span>${b.occupied||0}/${Math.floor(def.cap*(1+(b.level-1)*0.5))}</span></div>`;
+  if(def.kind==='register') statusLine += `<div class="row"><span>Queue</span><span>${(b.queueList||[]).length} waiting</span></div>`;
+  infoContent.innerHTML = `<h3>${def.name} #${b.id}</h3>
+    <div class="sub">Level ${b.level} / ${def.maxLevel} • ${b.w}×${b.h} cells</div>
+    ${statusLine}
+    <button id="upgradeBtn" ${canUpgrade?'':'disabled'}>${canUpgrade?'Upgrade — $'+upgradeCost.toLocaleString():'Max Level'}</button>
+    ${(def.kind==='slip' && b.boat && !b.boatOut) ? '<button id="sellBoatBtn">Sell Boat (50% refund)</button>' : ''}
+    <button id="deleteBtn" class="danger">Bulldoze (40% refund)</button>
+    <button id="resumeBtn2">Resume Walking</button>`;
+  if(def.kind==='slip' && b.boat && !b.boatOut){
+    document.getElementById('sellBoatBtn').onclick=()=>{
+      const refund = Math.floor(BOAT_DEFS[b.boat.type].cost*0.5);
+      state.money += refund;
+      if(b.dockedBoatMesh){ scene.remove(b.dockedBoatMesh); b.dockedBoatMesh=null; }
+      b.boat = null;
+      toast('Boat sold. +$'+refund.toLocaleString());
+      selectBuildingUI(b);
+    };
+  }
+  document.getElementById('upgradeBtn').onclick=()=>{
+    if(!canUpgrade) return;
+    if(state.money<upgradeCost){ toast('Not enough money'); return; }
+    state.money-=upgradeCost; state.expenseToday+=upgradeCost; b.level++;
+    if(def.kind==='shelf'){ b.stock = def.maxStock; updateShelfVisual(b); }
+    toast(def.name+' upgraded to level '+b.level);
+    selectBuildingUI(b);
+  };
+  document.getElementById('deleteBtn').onclick=()=>{
+    const refund=Math.floor(def.cost*0.4);
+    state.money+=refund; removeBuilding(b); closeInfoPanel(); toast('Removed. +$'+refund.toLocaleString());
+  };
+  document.getElementById('resumeBtn2').onclick=()=>{ closeInfoPanel(); canvasEl.requestPointerLock(); };
+}
+
+/* ---------------- OPEN FOR BUSINESS ---------------- */
+document.getElementById('openBtn3d').onclick = ()=>{
+  const btn = document.getElementById('openBtn3d');
+  state.isOpen = !state.isOpen;
+  if(state.isOpen){
+    btn.textContent='■ CLOSE STORE'; btn.classList.add('closed');
+    toast('Store opened! Customers incoming.');
+  } else {
+    btn.textContent='▶ OPEN STORE'; btn.classList.remove('closed');
+    toast('Store closed.');
+  }
+};
+
+/* ---------------- GAME MENU: SAVE / LOAD / EXPAND / RESET ---------------- */
+document.getElementById('gameMenuBtn').onclick = ()=>{
+  if(document.pointerLockElement) document.exitPointerLock();
+  const expandCost = 25000 + state.ownedRect.w*Math.max(1,state.ownedRect.h-24)*90;
+  const bg=document.createElement('div'); bg.className='modal-bg';
+  bg.innerHTML = `<div class="modal"><h2>Business Menu</h2>
+    <p style="font-size:13px;color:var(--txt-dim)">Buy more land in any direction, manage your save, or start fresh.</p>
+    <p style="font-size:12px;color:var(--gold);margin:10px 0 4px;">Expand Land — $${expandCost.toLocaleString()} per direction</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <button id="expandN" class="sec">⬆ North</button>
+      <button id="expandS" class="sec">⬇ South</button>
+      <button id="expandW" class="sec">⬅ West</button>
+      <button id="expandE" class="sec">➡ East</button>
+    </div>
+    <button id="saveGameBtn" class="sec">💾 Save</button>
+    <button id="loadGameBtn" class="sec">📂 Load</button>
+    <button id="downloadSaveBtn" class="sec">⬇ Download Save File</button>
+    <button id="uploadSaveBtn" class="sec">⬆ Load Save File</button>
+    <input type="file" id="uploadSaveInput" accept="application/json" style="display:none;">
+    <button id="resetGameBtn" class="sec">🗑 New Business</button>
+    <button id="closeGameMenu" class="sec">Resume Walking</button>
+  </div>`;
+  document.body.appendChild(bg);
+  document.getElementById('uploadSaveBtn').onclick = ()=> document.getElementById('uploadSaveInput').click();
+  function doExpand(dir){
+    const cost = 25000 + state.ownedRect.w*state.ownedRect.h*90;
+    if(state.money<cost){ toast('Not enough money'); return; }
+    const r = state.ownedRect;
+    if(dir==='E'){ if(r.x+r.w+6>GRID_W){ toast('No more room to the east.'); return; } r.w += 6; }
+    else if(dir==='W'){ if(r.x-6<0){ toast('No more room to the west.'); return; } r.x -= 6; r.w += 6; }
+    else if(dir==='N'){ if(r.y-4<0){ toast('No more room to the north.'); return; } r.y -= 4; r.h += 4; }
+    else if(dir==='S'){ if(r.y+r.h+4>GRID_H){ toast('No more room to the south.'); return; } r.h += 4; }
+    state.money -= cost; state.expenseToday += cost;
+    rebuildOwnedGround();
+    pruneTreesInOwnedLand();
+    document.body.removeChild(bg); toast('Land expanded!');
+  }
+  document.getElementById('expandN').onclick = ()=>doExpand('N');
+  document.getElementById('expandS').onclick = ()=>doExpand('S');
+  document.getElementById('expandW').onclick = ()=>doExpand('W');
+  document.getElementById('expandE').onclick = ()=>doExpand('E');
+  document.getElementById('saveGameBtn').onclick = ()=>{
+    localStorage.setItem('wharf_save', JSON.stringify(buildSaveData()));
+    toast('Saved.');
+  };
+  document.getElementById('loadGameBtn').onclick = ()=>{
+    const raw = localStorage.getItem('wharf_save');
+    if(!raw){ toast('No save found.'); return; }
+    loadGame(JSON.parse(raw));
+    document.body.removeChild(bg); toast('Loaded.');
+  };
+  document.getElementById('downloadSaveBtn').onclick = ()=>{
+    const data = buildSaveData();
+    const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.href = url; a.download = `wharf-tycoon-day${state.day}-${stamp}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Save file downloaded.');
+  };
+  document.getElementById('uploadSaveInput').onchange = (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const data = JSON.parse(reader.result);
+        loadGame(data);
+        document.body.removeChild(bg);
+        toast('Save file loaded.');
+      }catch(err){
+        toast('That file could not be read as a save.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value='';
+  };
+  document.getElementById('resetGameBtn').onclick = ()=>{ location.reload(); };
+  document.getElementById('closeGameMenu').onclick = ()=>{ document.body.removeChild(bg); canvasEl.requestPointerLock(); };
+};
+function buildSaveData(){
+  return {
+    money:state.money, day:state.day, rating:state.rating,
+    ownedRect:state.ownedRect, nextId:state.nextId,
+    buildings: state.buildings.map(b=>({id:b.id,type:b.type,x:b.x,y:b.y,w:b.w,h:b.h,rot:b.rot,level:b.level,stock:b.stock,boat:b.boat,occupied:b.occupied})),
+    staff: state.staff.map(s=>({role:s.role, wage:s.wage})),
+  };
+}
+function loadGame(data){
+  [...state.buildings].forEach(b=>removeBuilding(b));
+  [...state.boats].forEach(b=>scene.remove(b.mesh));
+  [...state.customers].forEach(c=>scene.remove(c.mesh));
+  [...state.staff].forEach(s=>scene.remove(s.mesh));
+  state.boats=[]; state.customers=[]; state.staff=[];
+  state.money=data.money; state.day=data.day; state.rating=data.rating; state.isOpen=false;
+  state.ownedRect=data.ownedRect; state.nextId=data.nextId;
+  initTiles();
+  rebuildOwnedGround();
+  data.buildings.forEach(b=>{
+    const def = BUILDING_DEFS[b.type];
+    const built = {id:b.id, type:b.type, x:b.x,y:b.y,w:b.w,h:b.h,rot:b.rot,level:b.level};
+    if(def.kind==='shelf'){ built.stock = b.stock!==undefined?b.stock:def.maxStock; built.pendingCash=0; }
+    if(def.kind==='slip'){ built.boat = b.boat||null; built.boatOut=false; built.pendingCash=0; }
+    if(def.kind==='parking'){ built.occupied = 0; }
+    state.buildings.push(built);
+    for(let dy=0;dy<b.h;dy++) for(let dx=0;dx<b.w;dx++) tiles[b.y+dy][b.x+dx]={id:b.id, kind:def.kind};
+    const mesh = createBuildingMesh(b.type, def.w, def.h, b.rot);
+    const c = cellToWorld(b.x+b.w/2, b.y+b.h/2);
+    mesh.position.set(c.x,0,c.z);
+    buildingMeshGroup.add(mesh);
+    built.mesh = mesh;
+    updateShelfVisual(built);
+    if(built.boat) dockBoatVisual(built);
+  });
+  (data.staff||[]).forEach(s=>{
+    const key = Object.keys(STAFF_DEFS).find(k=>STAFF_DEFS[k].role===s.role);
+    if(key){ const cost=STAFF_DEFS[key].cost; STAFF_DEFS[key].cost=0; hireStaff(key); STAFF_DEFS[key].cost=cost; }
+  });
+  state.nextId = Math.max(state.nextId, ...state.buildings.map(b=>b.id+1), 1);
+  const btn=document.getElementById('openBtn3d'); btn.textContent='▶ OPEN STORE'; btn.classList.remove('closed');
+}
+
+/* ---------------- TIME CONTROLS ---------------- */
+function setSpeed(s){
+  state.speed=s;
+  ['btnPause','btnPlay','btnFast'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  if(s===0) document.getElementById('btnPause').classList.add('active');
+  else if(s>=8) document.getElementById('btnFast').classList.add('active');
+  else document.getElementById('btnPlay').classList.add('active');
+}
+document.getElementById('btnPause').onclick=()=>setSpeed(0);
+document.getElementById('btnPlay').onclick=()=>setSpeed(1);
+document.getElementById('btnFast').onclick=()=>setSpeed(8);
+
+/* ---------------- HUD SYNC ---------------- */
+function updateTopUI(){
+  document.getElementById('s-money').textContent = '$'+Math.floor(state.money).toLocaleString();
+  const full = Math.floor(state.rating);
+  document.getElementById('s-rating').textContent = '★'.repeat(full)+'☆'.repeat(5-full);
+  document.getElementById('s-cust').textContent = state.lastDayCust || state.custToday;
+  document.getElementById('s-boats').textContent = state.lastDayBoats || state.boatsToday;
+  const h = Math.floor(state.timeOfDay/60).toString().padStart(2,'0');
+  const m = Math.floor(state.timeOfDay%60).toString().padStart(2,'0');
+  document.getElementById('s-clock').textContent = `Day ${state.day} — ${h}:${m}`;
+}
+
+/* ---------------- FIXED DAYTIME LIGHTING (no time-lapse) ---------------- */
+function updateSky(){
+  // Keep the decorative sun glued to a fixed bearing relative to the player, no color/brightness cycling.
+  sunSprite.position.copy(sun.position).multiplyScalar(2.2).add(camera.position);
+}
+
+/* ---------------- MAIN SIM STEP ---------------- */
+let lastFrame = performance.now();
+let elapsedTotal = 0;
+function simStep(realDtSec){
+  elapsedTotal += realDtSec;
+  updateBoatDriving(realDtSec);
+  updatePlayerMovement(realDtSec);
+  updateJump(realDtSec);
+  hoverCell = getCrosshairCell();
+  updatePreview();
+  updateSlipHighlight();
+  updateInteractPrompt();
+  updateCashCollection();
+  updateTrashCollection();
+  animateWater(elapsedTotal);
+  if(!state.isOpen || state.speed===0){ updateSky(); return; }
+  const simMinutesPerSec = 3*state.speed;
+  const dtMinutes = simMinutesPerSec*realDtSec;
+  state.timeOfDay += dtMinutes;
+  if(state.timeOfDay>=1440){ state.timeOfDay-=1440; endDay(); }
+
+  const dtSimSec = realDtSec*state.speed;
+  state.spawnTimer -= dtSimSec;
+  const shelfSlipCount = state.buildings.filter(b=>['shelf','slip'].includes(BUILDING_DEFS[b.type].kind)).length;
+  const spawnInterval = Math.max(1.2, 6 - state.rating*0.7 - shelfSlipCount*0.1);
+  if(state.spawnTimer<=0){ trySpawnCustomer(); state.spawnTimer = spawnInterval*(0.7+Math.random()*0.6); }
+
+  updateCustomers(dtSimSec*2.2);
+  updateBoats(dtSimSec, elapsedTotal);
+  updateParkingCars(dtSimSec);
+  updateStaff(dtSimSec*2.2);
+  tickEconomy(dtMinutes);
+  checkMilestones();
+  updateSky();
+}
+
+function onResize(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+window.addEventListener('resize', onResize);
+
+function loop(now){
+  const dt = Math.min(0.1,(now-lastFrame)/1000);
+  lastFrame = now;
+  simStep(dt);
+  updateFxPopups(dt);
+  updateBuildingPops();
+  updatePiles(elapsedTotal);
+  updateDockedBoats(elapsedTotal);
+  swayTrees(elapsedTotal);
+  updateTopUI();
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
